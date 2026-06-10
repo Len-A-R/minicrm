@@ -66,6 +66,9 @@ public sealed class Booking
     public TimeOnly? ConfirmedTime { get; private set; }
     public DateTimeOffset? CompletedAt { get; private set; }
     public decimal? ActualRevenue { get; private set; }
+    public string? RejectionReason { get; private set; }
+    public string? SpecialistReply { get; private set; }
+    public DateTimeOffset? RepliedAt { get; private set; }
 
     public void SetMessage(string? message)
     {
@@ -86,6 +89,34 @@ public sealed class Booking
     }
 
     public void Reject() => Status = BookingStatus.Rejected;
+
+    public void Reject(string? reason)
+    {
+        if (reason is { Length: > 500 })
+        {
+            throw new ArgumentException("Rejection reason cannot exceed 500 characters.", nameof(reason));
+        }
+
+        Status = BookingStatus.Rejected;
+        RejectionReason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
+    }
+
+    public void Reply(string reply)
+    {
+        if (string.IsNullOrWhiteSpace(reply))
+        {
+            throw new ArgumentException("Reply is required.", nameof(reply));
+        }
+
+        var trimmed = reply.Trim();
+        if (trimmed.Length > 1000)
+        {
+            throw new ArgumentException("Reply cannot exceed 1000 characters.", nameof(reply));
+        }
+
+        SpecialistReply = trimmed;
+        RepliedAt = DateTimeOffset.UtcNow;
+    }
 
     public void Complete(decimal actualRevenue)
     {

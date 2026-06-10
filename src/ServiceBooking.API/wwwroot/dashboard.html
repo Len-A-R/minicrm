@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ServiceBooking · Кабинет специалиста</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body class="dashboard-body">
+  <aside class="dashboard-sidebar">
+    <div>
+      <p class="eyebrow">ServiceBooking</p>
+      <h1>Кабинет</h1>
+    </div>
+    <nav class="dashboard-nav" aria-label="Разделы кабинета">
+      <button type="button" class="dashboard-nav-item active" data-route="bookings">Заявки</button>
+      <button type="button" class="dashboard-nav-item" data-route="clients">Клиенты</button>
+    </nav>
+    <button type="button" class="secondary-button" id="logout-button">Выйти</button>
+  </aside>
+
+  <main class="dashboard-main">
+    <header class="dashboard-topbar">
+      <div>
+        <p class="eyebrow" id="dashboard-section-label">Заявки</p>
+        <h2 id="dashboard-title">Управление заявками</h2>
+      </div>
+      <button type="button" class="secondary-button" id="refresh-button">Обновить</button>
+    </header>
+
+    <section class="login-panel" id="login-panel" hidden>
+      <form id="login-form" class="login-form">
+        <div class="field-group">
+          <label for="login-email">Email</label>
+          <input id="login-email" type="email" autocomplete="email" required>
+        </div>
+        <div class="field-group">
+          <label for="login-password">Пароль</label>
+          <input id="login-password" type="password" autocomplete="current-password" required>
+        </div>
+        <button class="primary-button" type="submit">Войти</button>
+      </form>
+    </section>
+
+    <section class="dashboard-content" id="dashboard-content" aria-live="polite"></section>
+  </main>
+
+  <dialog class="action-dialog" id="action-dialog">
+    <form method="dialog" id="action-form">
+      <header class="dialog-header">
+        <h2 id="dialog-title">Действие</h2>
+        <button type="button" class="icon-button" id="dialog-close" aria-label="Закрыть">×</button>
+      </header>
+      <div class="dialog-body" id="dialog-body"></div>
+      <footer class="dialog-actions">
+        <button type="button" class="secondary-button" id="dialog-cancel">Отмена</button>
+        <button type="submit" class="primary-button" id="dialog-submit">Сохранить</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <div class="result-banner dashboard-toast" id="dashboard-toast" role="status" aria-live="polite"></div>
+  <script src="/dashboard.js" defer></script>
+</body>
+</html>

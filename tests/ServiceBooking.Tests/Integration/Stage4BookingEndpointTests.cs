@@ -133,10 +133,14 @@ public sealed class Stage4BookingEndpointTests
         var index = await client.GetStringAsync("/");
         var script = await client.GetStringAsync("/app.js");
         var styles = await client.GetStringAsync("/styles.css");
+        var dashboard = await client.GetStringAsync("/dashboard.html");
+        var dashboardScript = await client.GetStringAsync("/dashboard.js");
 
         Assert.Contains("Бронирование услуги", index);
         Assert.Contains("/api/v1/bookings", script);
         Assert.Contains(".step-card.active", styles);
+        Assert.Contains("Кабинет специалиста", dashboard);
+        Assert.Contains("/api/v1/specialist/bookings", dashboardScript);
     }
 
     private static async Task<BookingSetup> CreatePublicBookingSetupAsync(HttpClient client)

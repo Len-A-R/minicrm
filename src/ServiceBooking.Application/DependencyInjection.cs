@@ -5,6 +5,8 @@ using ServiceBooking.Application.Bookings;
 using ServiceBooking.Application.Catalog;
 using ServiceBooking.Application.Profile;
 using ServiceBooking.Application.Slots;
+using ServiceBooking.Application.SpecialistBookings;
+using ServiceBooking.Application.SpecialistClients;
 using ServiceBooking.Application.SpecialistServices;
 using ServiceBooking.Application.Specialists;
 using ServiceBooking.Application.Vacations;
@@ -19,6 +21,8 @@ public static class DependencyInjection
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IProfileService, ProfileService>();
         services.AddScoped<IBookingService, Bookings.BookingService>();
+        services.AddScoped<IBookingActionService, BookingActionService>();
+        services.AddScoped<ISpecialistClientService, SpecialistClientService>();
         services.AddScoped<IClientAutoCreationService, ClientAutoCreationService>();
         services.AddScoped<IPublicSpecialistService, PublicSpecialistService>();
         services.AddScoped<ILocationService, LocationService>();

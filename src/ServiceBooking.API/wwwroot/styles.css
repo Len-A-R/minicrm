@@ -364,6 +364,252 @@ textarea:focus {
   background: #fff0ee;
 }
 
+.dashboard-body {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  background: #eef2f6;
+}
+
+.dashboard-sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  padding: 28px 20px;
+  border-right: 1px solid var(--line);
+  background: #ffffff;
+}
+
+.dashboard-sidebar h1 {
+  font-size: 30px;
+}
+
+.dashboard-nav {
+  display: grid;
+  gap: 8px;
+}
+
+.dashboard-nav-item {
+  min-height: 44px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 0 12px;
+  color: #344054;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.dashboard-nav-item.active {
+  color: var(--accent-strong);
+  border-color: #b8ddd4;
+  background: var(--accent-soft);
+}
+
+.dashboard-main {
+  min-width: 0;
+  padding: 24px;
+}
+
+.dashboard-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.dashboard-topbar h2 {
+  font-size: 28px;
+}
+
+.dashboard-content {
+  min-height: 520px;
+  opacity: 1;
+  transform: translateX(0);
+  transition: opacity 220ms ease, transform 220ms ease;
+}
+
+.dashboard-content.is-transitioning {
+  opacity: 0;
+  transform: translateX(10px);
+}
+
+.login-panel {
+  max-width: 520px;
+  margin-bottom: 18px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.login-form {
+  display: grid;
+  gap: 16px;
+  min-height: auto;
+}
+
+.table-toolbar {
+  display: grid;
+  grid-template-columns: 180px 180px minmax(220px, 1fr);
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.data-table-wrap {
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.data-table {
+  width: 100%;
+  min-width: 920px;
+  border-collapse: collapse;
+}
+
+.data-table th,
+.data-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.data-table th {
+  color: #475467;
+  background: #f8fafc;
+  font-size: 13px;
+  text-transform: uppercase;
+}
+
+.muted-cell {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.mono {
+  font-family: "SFMono-Regular", Consolas, monospace;
+  color: #475467;
+}
+
+.status-badge {
+  display: inline-grid;
+  min-width: 108px;
+  min-height: 28px;
+  place-items: center;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.status-1,
+.status-new {
+  color: #175cd3;
+  background: #eaf2ff;
+}
+
+.status-2,
+.status-confirmed {
+  color: #087443;
+  background: #e7f8ef;
+}
+
+.status-3,
+.status-rejected {
+  color: #b42318;
+  background: #fff0ee;
+}
+
+.status-4,
+.status-completed {
+  color: #344054;
+  background: #eef2f6;
+}
+
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 240px;
+}
+
+.table-action,
+.icon-button {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: #344054;
+  background: #ffffff;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.table-action {
+  min-height: 32px;
+  padding: 0 9px;
+  font-size: 13px;
+}
+
+.icon-button {
+  width: 36px;
+  height: 36px;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.action-dialog {
+  width: min(560px, calc(100vw - 28px));
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0;
+  box-shadow: var(--shadow);
+}
+
+.action-dialog::backdrop {
+  background: rgba(15, 23, 42, 0.35);
+}
+
+.action-dialog form {
+  min-height: auto;
+}
+
+.dialog-header,
+.dialog-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.dialog-actions {
+  justify-content: flex-end;
+  border-top: 1px solid var(--line);
+  border-bottom: 0;
+}
+
+.dialog-body {
+  padding: 18px;
+}
+
+.dashboard-toast {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  width: min(420px, calc(100vw - 36px));
+  margin: 0;
+}
+
 @media (max-width: 840px) {
   .booking-shell {
     padding: 14px;
@@ -404,5 +650,33 @@ textarea:focus {
   .primary-button,
   .secondary-button {
     flex: 1 1 140px;
+  }
+
+  .dashboard-body {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-sidebar {
+    position: static;
+    height: auto;
+    gap: 16px;
+    padding: 18px;
+  }
+
+  .dashboard-nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-main {
+    padding: 16px;
+  }
+
+  .dashboard-topbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .table-toolbar {
+    grid-template-columns: 1fr;
   }
 }

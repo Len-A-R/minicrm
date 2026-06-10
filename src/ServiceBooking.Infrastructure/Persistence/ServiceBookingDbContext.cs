@@ -132,6 +132,8 @@ public sealed class ServiceBookingDbContext(DbContextOptions<ServiceBookingDbCon
             entity.Property(booking => booking.Status).HasConversion<string>().HasMaxLength(24).IsRequired();
             entity.Property(booking => booking.CreatedAt).IsRequired();
             entity.Property(booking => booking.ActualRevenue).HasPrecision(18, 2);
+            entity.Property(booking => booking.RejectionReason).HasMaxLength(500);
+            entity.Property(booking => booking.SpecialistReply).HasMaxLength(1000);
             entity.HasIndex(booking => new { booking.SpecialistId, booking.Status });
             entity.HasIndex(booking => new { booking.RequestedDate, booking.RequestedTime });
 
