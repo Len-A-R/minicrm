@@ -1,0 +1,2 @@
+2026-06-11 01:42:41.366 +03:00 [WRN] Failed to determine the https port for redirect.
+2026-06-11 01:43:15.336 +03:00 [ERR] An error occurred using the connection to database 'main' on server 'service-booking.db'.

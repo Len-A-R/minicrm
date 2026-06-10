@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using ServiceBooking.Application.Auth;
+using ServiceBooking.Application.Bookings;
 using ServiceBooking.Application.Catalog;
 using ServiceBooking.Application.Common;
 using ServiceBooking.Application.Profile;
@@ -10,6 +11,7 @@ using ServiceBooking.Application.Slots;
 using ServiceBooking.Application.Specialists;
 using ServiceBooking.Application.SpecialistServices;
 using ServiceBooking.Application.Vacations;
+using ServiceBooking.Infrastructure.Bookings;
 using ServiceBooking.Infrastructure.Catalog;
 using ServiceBooking.Infrastructure.Files;
 using ServiceBooking.Infrastructure.Persistence;
@@ -31,6 +33,9 @@ public static class DependencyInjection
 
         services.AddDbContext<ServiceBookingDbContext>(options => options.UseSqlite(connectionString));
         services.AddScoped<ISpecialistRepository, SpecialistRepository>();
+        services.AddScoped<IPublicSpecialistRepository, PublicSpecialistRepository>();
+        services.AddScoped<IBookingRepository, BookingRepository>();
+        services.AddScoped<IClientAutoCreationRepository, ClientAutoCreationRepository>();
         services.AddScoped<ILocationRepository, LocationRepository>();
         services.AddScoped<IServiceCatalogRepository, ServiceCatalogRepository>();
         services.AddScoped<ISpecialistServiceRepository, SpecialistServiceRepository>();

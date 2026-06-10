@@ -1,10 +1,12 @@
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
 using ServiceBooking.Application.Auth;
+using ServiceBooking.Application.Bookings;
 using ServiceBooking.Application.Catalog;
 using ServiceBooking.Application.Profile;
 using ServiceBooking.Application.Slots;
 using ServiceBooking.Application.SpecialistServices;
+using ServiceBooking.Application.Specialists;
 using ServiceBooking.Application.Vacations;
 
 namespace ServiceBooking.Application;
@@ -16,6 +18,9 @@ public static class DependencyInjection
     {
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IProfileService, ProfileService>();
+        services.AddScoped<IBookingService, Bookings.BookingService>();
+        services.AddScoped<IClientAutoCreationService, ClientAutoCreationService>();
+        services.AddScoped<IPublicSpecialistService, PublicSpecialistService>();
         services.AddScoped<ILocationService, LocationService>();
         services.AddScoped<IServiceCatalogService, ServiceCatalogService>();
         services.AddScoped<ISpecialistServicesService, SpecialistServicesService>();
