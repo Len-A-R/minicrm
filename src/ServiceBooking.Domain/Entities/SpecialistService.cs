@@ -43,6 +43,16 @@ public sealed class SpecialistService
         Price = decimal.Round(price, 2);
     }
 
+    public void ChangeService(Guid serviceId)
+    {
+        if (serviceId == Guid.Empty)
+        {
+            throw new ArgumentException("Service id is required.", nameof(serviceId));
+        }
+
+        ServiceId = serviceId;
+    }
+
     public void SetDuration(int durationMinutes)
     {
         if (durationMinutes <= 0)

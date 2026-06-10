@@ -3,13 +3,21 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using ServiceBooking.Application.Auth;
+using ServiceBooking.Application.Catalog;
 using ServiceBooking.Application.Common;
 using ServiceBooking.Application.Profile;
+using ServiceBooking.Application.Slots;
 using ServiceBooking.Application.Specialists;
+using ServiceBooking.Application.SpecialistServices;
+using ServiceBooking.Application.Vacations;
+using ServiceBooking.Infrastructure.Catalog;
 using ServiceBooking.Infrastructure.Files;
 using ServiceBooking.Infrastructure.Persistence;
 using ServiceBooking.Infrastructure.Security;
+using ServiceBooking.Infrastructure.Slots;
 using ServiceBooking.Infrastructure.Specialists;
+using ServiceBooking.Infrastructure.SpecialistServices;
+using ServiceBooking.Infrastructure.Vacations;
 
 namespace ServiceBooking.Infrastructure;
 
@@ -23,6 +31,11 @@ public static class DependencyInjection
 
         services.AddDbContext<ServiceBookingDbContext>(options => options.UseSqlite(connectionString));
         services.AddScoped<ISpecialistRepository, SpecialistRepository>();
+        services.AddScoped<ILocationRepository, LocationRepository>();
+        services.AddScoped<IServiceCatalogRepository, ServiceCatalogRepository>();
+        services.AddScoped<ISpecialistServiceRepository, SpecialistServiceRepository>();
+        services.AddScoped<IVacationRepository, VacationRepository>();
+        services.AddScoped<ISlotRepository, SlotRepository>();
         services.AddScoped<IPasswordHasher, BCryptPasswordHasher>();
         services.AddScoped<ITokenService, JwtTokenService>();
         services.AddScoped<IAvatarStorage, LocalAvatarStorage>();

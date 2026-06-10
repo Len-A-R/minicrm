@@ -25,6 +25,11 @@ public sealed class Vacation
     public DateOnly Date { get; private set; }
     public string? Reason { get; private set; }
 
+    public void ChangeDate(DateOnly date)
+    {
+        Date = date;
+    }
+
     public void SetReason(string? reason)
     {
         if (reason is { Length: > 250 })
