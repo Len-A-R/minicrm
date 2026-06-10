@@ -36,6 +36,7 @@ public sealed class ServiceBookingDbContext(DbContextOptions<ServiceBookingDbCon
             entity.Property(specialist => specialist.Email).HasMaxLength(254).IsRequired();
             entity.Property(specialist => specialist.Phone).HasMaxLength(32).IsRequired();
             entity.Property(specialist => specialist.PasswordHash).HasMaxLength(500).IsRequired();
+            entity.Property(specialist => specialist.RefreshTokenHash).HasMaxLength(500);
             entity.Property(specialist => specialist.AvatarUrl).HasMaxLength(500);
             entity.Property(specialist => specialist.VenueName).HasMaxLength(160);
             entity.Property(specialist => specialist.CreatedAt).IsRequired();

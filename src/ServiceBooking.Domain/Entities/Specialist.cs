@@ -29,6 +29,8 @@ public sealed class Specialist
     public string Email { get; private set; }
     public string Phone { get; private set; }
     public string PasswordHash { get; private set; }
+    public string? RefreshTokenHash { get; private set; }
+    public DateTimeOffset? RefreshTokenExpiresAt { get; private set; }
     public string? AvatarUrl { get; private set; }
     public string? VenueName { get; private set; }
     public Guid? LocationId { get; private set; }
@@ -44,6 +46,30 @@ public sealed class Specialist
         Phone = ValidateRequired(phone, nameof(phone), 32, 3);
         VenueName = string.IsNullOrWhiteSpace(venueName) ? null : ValidateRequired(venueName, nameof(venueName), 160, 2);
         LocationId = locationId;
+    }
+
+    public void ChangePasswordHash(string passwordHash)
+    {
+        PasswordHash = ValidateRequired(passwordHash, nameof(passwordHash), 500, 8);
+    }
+
+    public void SetRefreshToken(string refreshTokenHash, DateTimeOffset expiresAt)
+    {
+        RefreshTokenHash = ValidateRequired(refreshTokenHash, nameof(refreshTokenHash), 500, 8);
+        RefreshTokenExpiresAt = expiresAt;
+    }
+
+    public void ClearRefreshToken()
+    {
+        RefreshTokenHash = null;
+        RefreshTokenExpiresAt = null;
+    }
+
+    public bool HasActiveRefreshToken(DateTimeOffset utcNow)
+    {
+        return !string.IsNullOrWhiteSpace(RefreshTokenHash)
+            && RefreshTokenExpiresAt.HasValue
+            && RefreshTokenExpiresAt.Value > utcNow;
     }
 
     public void SetAvatarUrl(string? avatarUrl)

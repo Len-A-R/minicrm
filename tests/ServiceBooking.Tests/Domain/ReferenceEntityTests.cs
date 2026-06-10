@@ -12,10 +12,16 @@ public sealed class ReferenceEntityTests
 
         specialist.UpdateProfile("Maria P.", "+15550001123", "Main Studio", Guid.NewGuid());
         specialist.SetAvatarUrl("https://example.com/avatar.png");
+        specialist.SetRefreshToken("refresh-hash", DateTimeOffset.UtcNow.AddDays(1));
 
         Assert.Equal("Maria P.", specialist.FullName);
         Assert.Equal("Main Studio", specialist.VenueName);
         Assert.Equal("https://example.com/avatar.png", specialist.AvatarUrl);
+        Assert.True(specialist.HasActiveRefreshToken(DateTimeOffset.UtcNow));
+
+        specialist.ClearRefreshToken();
+
+        Assert.False(specialist.HasActiveRefreshToken(DateTimeOffset.UtcNow));
     }
 
     [Fact]
@@ -84,6 +90,9 @@ public sealed class ReferenceEntityTests
         Assert.Throws<ArgumentException>(() => new Client("A", "+15557778899"));
         Assert.Throws<ArgumentException>(() => new Specialist("A", "mail@example.com", "+1555", "hashed-password"));
         Assert.Throws<ArgumentException>(() => new Specialist("Full Name", "mail@example.com", "+1555", "short"));
+        Assert.Throws<ArgumentException>(() => new BookingService(Guid.NewGuid(), "", 10m, 10));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new BookingService(Guid.NewGuid(), "Name", 0m, 10));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new BookingService(Guid.NewGuid(), "Name", 10m, 0));
         Assert.Throws<ArgumentException>(() => new SpecialistService(Guid.Empty, Guid.NewGuid(), 10m, 10));
         Assert.Throws<ArgumentException>(() => new SpecialistService(Guid.NewGuid(), Guid.Empty, 10m, 10));
         Assert.Throws<ArgumentException>(() => new Vacation(Guid.Empty, new DateOnly(2026, 7, 1)));
