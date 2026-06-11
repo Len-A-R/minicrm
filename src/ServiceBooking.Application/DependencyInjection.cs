@@ -6,6 +6,7 @@ using ServiceBooking.Application.Calendar;
 using ServiceBooking.Application.Catalog;
 using ServiceBooking.Application.Kanban;
 using ServiceBooking.Application.Profile;
+using ServiceBooking.Application.Reports;
 using ServiceBooking.Application.Slots;
 using ServiceBooking.Application.SpecialistBookings;
 using ServiceBooking.Application.SpecialistClients;
@@ -34,6 +35,7 @@ public static class DependencyInjection
         services.AddScoped<ISpecialistServicesService, SpecialistServicesService>();
         services.AddScoped<IVacationService, VacationService>();
         services.AddScoped<ISlotService, SlotService>();
+        services.AddScoped<IReportService, ReportService>();
 
         return services;
     }

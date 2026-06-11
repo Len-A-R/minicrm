@@ -18,7 +18,11 @@ const dashboardApi = {
   reschedule: (id) => `/api/v1/calendar/${encodeURIComponent(id)}/reschedule`,
   cancelCalendar: (id) => `/api/v1/calendar/${encodeURIComponent(id)}`,
   kanban: (date) => `/api/v1/kanban?date=${encodeURIComponent(date)}`,
-  kanbanMove: (id) => `/api/v1/kanban/${encodeURIComponent(id)}/move`
+  kanbanMove: (id) => `/api/v1/kanban/${encodeURIComponent(id)}/move`,
+  reportsSummary: (from, to) => `/api/v1/reports/summary?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
+  reportsByService: (from, to) => `/api/v1/reports/by-service?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
+  reportsByClient: (from, to) => `/api/v1/reports/by-client?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
+  reportsByDay: (from, to) => `/api/v1/reports/by-day?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
 };
 
 const dashboardState = {
@@ -29,6 +33,11 @@ const dashboardState = {
   calendarView: "month",
   calendarDate: todayIso(),
   kanbanDate: todayIso(),
+  reportsFrom: addDaysIso(todayIso(), -30),
+  reportsTo: todayIso(),
+  reportsGrouping: "day",
+  reportCharts: [],
+  reportData: null,
   token: localStorage.getItem("serviceBookingAccessToken") || ""
 };
 
@@ -73,7 +82,7 @@ function initDashboard() {
 
 function getRouteFromLocation() {
   const route = new URLSearchParams(location.search).get("section");
-  return ["profile", "bookings", "clients", "services", "calendar", "kanban"].includes(route) ? route : "bookings";
+  return ["profile", "bookings", "clients", "services", "calendar", "kanban", "reports"].includes(route) ? route : "bookings";
 }
 
 function navigate(route) {
@@ -119,6 +128,9 @@ async function loadRoute(force) {
   }
 
   dashboardEls.loginPanel.hidden = true;
+  if (dashboardState.route !== "reports") {
+    destroyReportCharts();
+  }
   dashboardEls.content.classList.add("is-transitioning");
   setTimeout(async () => {
     try {
@@ -132,6 +144,8 @@ async function loadRoute(force) {
         await renderCalendar(force);
       } else if (dashboardState.route === "kanban") {
         await renderKanban(force);
+      } else if (dashboardState.route === "reports") {
+        await renderReports(force);
       } else {
         await renderBookings(force);
       }
@@ -154,7 +168,8 @@ function updateChrome() {
     clients: ["Клиенты", "Клиентская база"],
     services: ["Услуги", "Предоставляемые услуги"],
     calendar: ["Календарь", "Расписание"],
-    kanban: ["Kanban", "Доска заявок"]
+    kanban: ["Kanban", "Доска заявок"],
+    reports: ["Бухгалтерия", "Финансовая аналитика"]
   };
   const [label, title] = titles[dashboardState.route] || titles.bookings;
   dashboardEls.title.textContent = title;
@@ -785,6 +800,283 @@ async function moveKanbanCard(bookingId, status) {
   }
 }
 
+async function renderReports(force) {
+  dashboardEls.content.innerHTML = `<div class="empty-state">Загрузка...</div>`;
+  if (dashboardState.reportsFrom > dashboardState.reportsTo) {
+    dashboardEls.content.innerHTML = `<div class="empty-state">Начальная дата не может быть позже конечной.</div>`;
+    return;
+  }
+
+  const from = dashboardState.reportsFrom;
+  const to = dashboardState.reportsTo;
+  const [summary, byService, byClient, byDay] = await Promise.all([
+    getCached(`reports-summary:${from}:${to}`, dashboardApi.reportsSummary(from, to), force),
+    getCached(`reports-by-service:${from}:${to}`, dashboardApi.reportsByService(from, to), force),
+    getCached(`reports-by-client:${from}:${to}`, dashboardApi.reportsByClient(from, to), force),
+    getCached(`reports-by-day:${from}:${to}`, dashboardApi.reportsByDay(from, to), force)
+  ]);
+  const reportData = { summary, byService, byClient, byDay };
+  dashboardState.reportData = reportData;
+
+  dashboardEls.content.innerHTML = `
+    <section class="reports-page">
+      <div class="reports-toolbar">
+        <div class="segmented-control report-range-control" aria-label="Период отчета">
+          <button type="button" class="segment-button" data-report-range="7">7 дней</button>
+          <button type="button" class="segment-button" data-report-range="30">30 дней</button>
+          <button type="button" class="segment-button" data-report-range="month">Месяц</button>
+        </div>
+        <div class="reports-date-range">
+          <div class="field-group">
+            <label for="reports-from">С</label>
+            <input id="reports-from" type="date" value="${from}">
+          </div>
+          <div class="field-group">
+            <label for="reports-to">По</label>
+            <input id="reports-to" type="date" value="${to}">
+          </div>
+          <div class="field-group">
+            <label for="reports-grouping">Группировка</label>
+            <select id="reports-grouping">
+              <option value="day"${dashboardState.reportsGrouping === "day" ? " selected" : ""}>По дням</option>
+              <option value="service"${dashboardState.reportsGrouping === "service" ? " selected" : ""}>По услугам</option>
+              <option value="client"${dashboardState.reportsGrouping === "client" ? " selected" : ""}>По клиентам</option>
+            </select>
+          </div>
+          <button type="button" class="secondary-button" id="reports-export">CSV</button>
+        </div>
+      </div>
+
+      <div class="summary-grid">
+        <article class="summary-card">
+          <span>Выручка</span>
+          <strong>${formatReportMoney(summary.totalRevenue)}</strong>
+        </article>
+        <article class="summary-card">
+          <span>Выполнено</span>
+          <strong>${summary.completedBookings}</strong>
+        </article>
+        <article class="summary-card">
+          <span>Средний чек</span>
+          <strong>${formatReportMoney(summary.averageCheck)}</strong>
+        </article>
+      </div>
+
+      <div class="chart-grid" id="reports-chart-grid">
+        <section class="chart-panel">
+          <header>Динамика выручки</header>
+          <canvas id="revenue-line-chart" aria-label="Динамика выручки" role="img"></canvas>
+        </section>
+        <section class="chart-panel">
+          <header>Выручка по дням</header>
+          <canvas id="revenue-bar-chart" aria-label="Выручка по дням" role="img"></canvas>
+        </section>
+        <section class="chart-panel">
+          <header>Услуги</header>
+          <canvas id="service-pie-chart" aria-label="Выручка по услугам" role="img"></canvas>
+        </section>
+        <section class="chart-panel">
+          <header>Клиенты</header>
+          <canvas id="client-bar-chart" aria-label="Выручка по клиентам" role="img"></canvas>
+        </section>
+      </div>
+
+      <div id="reports-table">${renderReportsTable(reportData)}</div>
+    </section>`;
+
+  dashboardEls.content.querySelectorAll("[data-report-range]").forEach((button) => {
+    button.addEventListener("click", () => applyReportQuickRange(button.dataset.reportRange));
+  });
+  dashboardEls.content.querySelector("#reports-from").addEventListener("change", (event) => {
+    dashboardState.reportsFrom = event.target.value || addDaysIso(todayIso(), -30);
+    renderReports(true);
+  });
+  dashboardEls.content.querySelector("#reports-to").addEventListener("change", (event) => {
+    dashboardState.reportsTo = event.target.value || todayIso();
+    renderReports(true);
+  });
+  dashboardEls.content.querySelector("#reports-grouping").addEventListener("change", (event) => {
+    dashboardState.reportsGrouping = event.target.value;
+    document.querySelector("#reports-table").innerHTML = renderReportsTable(reportData);
+  });
+  dashboardEls.content.querySelector("#reports-export").addEventListener("click", exportReportsCsv);
+  renderReportCharts(reportData);
+}
+
+function renderReportsTable(reportData) {
+  const grouping = dashboardState.reportsGrouping;
+  const table = getReportTable(grouping, reportData);
+  return `
+    <div class="data-table-wrap reports-table-wrap">
+      <table class="data-table reports-table">
+        <thead>
+          <tr>${table.headers.map((header) => `<th>${escapeDashboardHtml(header)}</th>`).join("")}</tr>
+        </thead>
+        <tbody>
+          ${table.rows.map((row) => `
+            <tr>${row.map((cell) => `<td>${escapeDashboardHtml(cell)}</td>`).join("")}</tr>`).join("")
+            || `<tr><td colspan="${table.headers.length}">Данных за выбранный период нет.</td></tr>`}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+function getReportTable(grouping, reportData) {
+  if (grouping === "service") {
+    return {
+      headers: ["Услуга", "Выручка", "Заявок", "Количество"],
+      rows: reportData.byService.map((item) => [
+        item.serviceName,
+        formatReportMoney(item.revenue),
+        String(item.completedBookings),
+        String(item.quantity)
+      ])
+    };
+  }
+
+  if (grouping === "client") {
+    return {
+      headers: ["Клиент", "Телефон", "Выручка", "Заявок"],
+      rows: reportData.byClient.map((item) => [
+        item.clientName,
+        item.clientPhone,
+        formatReportMoney(item.revenue),
+        String(item.completedBookings)
+      ])
+    };
+  }
+
+  return {
+    headers: ["Дата", "Выручка", "Заявок", "Средний чек"],
+    rows: reportData.byDay.map((item) => [
+      formatShortDate(item.date),
+      formatReportMoney(item.revenue),
+      String(item.completedBookings),
+      formatReportMoney(item.averageCheck)
+    ])
+  };
+}
+
+function applyReportQuickRange(range) {
+  const today = todayIso();
+  if (range === "month") {
+    const date = parseIsoDate(today);
+    dashboardState.reportsFrom = formatIsoDate(new Date(date.getFullYear(), date.getMonth(), 1));
+    dashboardState.reportsTo = formatIsoDate(new Date(date.getFullYear(), date.getMonth() + 1, 0));
+  } else {
+    const days = Number(range) || 30;
+    dashboardState.reportsFrom = addDaysIso(today, -(days - 1));
+    dashboardState.reportsTo = today;
+  }
+
+  renderReports(true);
+}
+
+function renderReportCharts(reportData) {
+  destroyReportCharts();
+  const chartGrid = document.querySelector("#reports-chart-grid");
+  if (!window.Chart) {
+    chartGrid?.insertAdjacentHTML(
+      "afterbegin",
+      `<div class="empty-state reports-chart-note">Диаграммы недоступны, таблица и CSV сформированы.</div>`);
+    return;
+  }
+
+  const dayLabels = reportData.byDay.map((item) => formatShortDate(item.date));
+  const dayRevenue = reportData.byDay.map((item) => Number(item.revenue));
+  const serviceItems = reportData.byService.length
+    ? reportData.byService
+    : [{ serviceName: "Нет данных", revenue: 0 }];
+  const clientItems = reportData.byClient.slice(0, 8);
+  const palette = ["#146c5f", "#1f4e79", "#b54708", "#7a5af8", "#c11574", "#475467", "#079455", "#d92d20"];
+  const commonOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { labels: { boxWidth: 12, font: { size: 12 } } }
+    }
+  };
+
+  dashboardState.reportCharts = [
+    new Chart(document.querySelector("#revenue-line-chart"), {
+      type: "line",
+      data: {
+        labels: dayLabels,
+        datasets: [{
+          label: "Выручка",
+          data: dayRevenue,
+          borderColor: "#146c5f",
+          backgroundColor: "rgba(20, 108, 95, 0.14)",
+          tension: 0.25,
+          fill: true
+        }]
+      },
+      options: { ...commonOptions, scales: { y: { beginAtZero: true } } }
+    }),
+    new Chart(document.querySelector("#revenue-bar-chart"), {
+      type: "bar",
+      data: {
+        labels: dayLabels,
+        datasets: [{ label: "Выручка", data: dayRevenue, backgroundColor: "#1f4e79" }]
+      },
+      options: { ...commonOptions, scales: { y: { beginAtZero: true } } }
+    }),
+    new Chart(document.querySelector("#service-pie-chart"), {
+      type: "doughnut",
+      data: {
+        labels: serviceItems.map((item) => item.serviceName),
+        datasets: [{
+          data: serviceItems.map((item) => Number(item.revenue)),
+          backgroundColor: serviceItems.map((_, index) => palette[index % palette.length])
+        }]
+      },
+      options: commonOptions
+    }),
+    new Chart(document.querySelector("#client-bar-chart"), {
+      type: "bar",
+      data: {
+        labels: clientItems.map((item) => item.clientName),
+        datasets: [{ label: "Выручка", data: clientItems.map((item) => Number(item.revenue)), backgroundColor: "#b54708" }]
+      },
+      options: { ...commonOptions, indexAxis: "y", scales: { x: { beginAtZero: true } } }
+    })
+  ];
+}
+
+function destroyReportCharts() {
+  dashboardState.reportCharts.forEach((chart) => chart.destroy());
+  dashboardState.reportCharts = [];
+}
+
+function exportReportsCsv() {
+  if (!dashboardState.reportData) {
+    showDashboardToast("Нет данных для экспорта.", true);
+    return;
+  }
+
+  const table = getReportTable(dashboardState.reportsGrouping, dashboardState.reportData);
+  const csv = [table.headers, ...table.rows]
+    .map((row) => row.map(csvEscape).join(";"))
+    .join("\r\n");
+  downloadCsv(
+    `reports-${dashboardState.reportsGrouping}-${dashboardState.reportsFrom}-${dashboardState.reportsTo}.csv`,
+    `\uFEFF${csv}`);
+}
+
+function downloadCsv(fileName, content) {
+  const url = URL.createObjectURL(new Blob([content], { type: "text/csv;charset=utf-8" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function csvEscape(value) {
+  const text = String(value ?? "");
+  return /[";\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+}
+
 async function openBookingAction(action, bookingId) {
   const booking = await requestJson(dashboardApi.booking(bookingId));
   dashboardEls.actionForm.onsubmit = async (event) => {
@@ -970,6 +1262,12 @@ function todayIso() {
   return formatIsoDate(new Date());
 }
 
+function addDaysIso(value, days) {
+  const date = parseIsoDate(value);
+  date.setDate(date.getDate() + days);
+  return formatIsoDate(date);
+}
+
 function formatShortDate(value) {
   return new Intl.DateTimeFormat("ru-RU", { weekday: "short", day: "2-digit", month: "2-digit" })
     .format(parseIsoDate(value));
@@ -993,6 +1291,14 @@ function formatDateTime(value) {
 
 function formatDashboardMoney(value) {
   return new Intl.NumberFormat("ru-RU", { style: "currency", currency: "RUB", maximumFractionDigits: 0 }).format(value);
+}
+
+function formatReportMoney(value) {
+  return new Intl.NumberFormat("ru-RU", {
+    style: "currency",
+    currency: "RUB",
+    maximumFractionDigits: 2
+  }).format(Number(value) || 0);
 }
 
 function normalizeTime(value) {

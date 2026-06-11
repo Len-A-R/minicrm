@@ -145,16 +145,21 @@ public sealed class Stage4BookingEndpointTests
         Assert.Contains("Кабинет специалиста", dashboard);
         Assert.Contains("data-route=\"profile\"", dashboard);
         Assert.Contains("data-route=\"services\"", dashboard);
+        Assert.Contains("data-route=\"reports\"", dashboard);
+        Assert.Contains("chart.js", dashboard);
         Assert.Contains("/api/v1/profile", dashboardScript);
         Assert.Contains("/api/v1/locations", dashboardScript);
         Assert.Contains("/api/v1/specialist/bookings", dashboardScript);
         Assert.Contains("/api/v1/specialist-services", dashboardScript);
         Assert.Contains("/api/v1/calendar", dashboardScript);
         Assert.Contains("/api/v1/kanban", dashboardScript);
+        Assert.Contains("/api/v1/reports/summary", dashboardScript);
         Assert.Contains(".profile-editor", styles);
         Assert.Contains(".service-manager", styles);
         Assert.Contains(".kanban-board", styles);
         Assert.Contains(".calendar-grid", styles);
+        Assert.Contains(".chart-grid", styles);
+        Assert.Contains(".summary-card", styles);
         Assert.Contains("Регистрация специалиста", register);
         Assert.Contains("/api/v1/auth/register", registerScript);
     }

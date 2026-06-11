@@ -132,7 +132,7 @@ public sealed class Booking
         RejectionReason = null;
     }
 
-    public void Complete(decimal actualRevenue)
+    public void Complete(decimal actualRevenue, DateTimeOffset? completedAt = null)
     {
         if (actualRevenue < 0)
         {
@@ -141,7 +141,7 @@ public sealed class Booking
 
         Status = BookingStatus.Completed;
         ActualRevenue = decimal.Round(actualRevenue, 2);
-        CompletedAt = DateTimeOffset.UtcNow;
+        CompletedAt = completedAt ?? DateTimeOffset.UtcNow;
     }
 
     private void RecalculateTotals()

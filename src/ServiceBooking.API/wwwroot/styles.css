@@ -921,6 +921,94 @@ textarea:focus {
   color: var(--muted);
 }
 
+.reports-page {
+  display: grid;
+  gap: 16px;
+}
+
+.reports-toolbar {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.report-range-control {
+  grid-template-columns: repeat(3, minmax(92px, 1fr));
+}
+
+.reports-date-range {
+  display: grid;
+  grid-template-columns: 150px 150px 180px minmax(96px, auto);
+  align-items: end;
+  gap: 10px;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.summary-card,
+.chart-panel {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.summary-card {
+  display: grid;
+  gap: 8px;
+  min-height: 104px;
+  padding: 16px;
+}
+
+.summary-card span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.summary-card strong {
+  color: #18202b;
+  font-size: 28px;
+  line-height: 1.1;
+}
+
+.chart-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.chart-panel {
+  display: grid;
+  grid-template-rows: auto minmax(260px, 1fr);
+  min-height: 330px;
+  padding: 14px;
+}
+
+.chart-panel header {
+  margin-bottom: 10px;
+  color: #344054;
+  font-weight: 900;
+}
+
+.chart-panel canvas {
+  width: 100% !important;
+  height: 260px !important;
+}
+
+.reports-chart-note {
+  grid-column: 1 / -1;
+}
+
+.reports-table {
+  min-width: 760px;
+}
+
 @media (max-width: 840px) {
   .booking-shell {
     padding: 14px;
@@ -1008,6 +1096,17 @@ textarea:focus {
   .calendar-grid.month-view,
   .calendar-grid.week-view,
   .kanban-board {
+    grid-template-columns: 1fr;
+  }
+
+  .reports-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .reports-date-range,
+  .summary-grid,
+  .chart-grid {
     grid-template-columns: 1fr;
   }
 }
