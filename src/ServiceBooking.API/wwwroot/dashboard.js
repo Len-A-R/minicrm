@@ -1,20 +1,34 @@
 const dashboardApi = {
   login: "/api/v1/auth/login",
+  profile: "/api/v1/profile",
+  locations: "/api/v1/locations",
   bookings: "/api/v1/specialist/bookings",
   booking: (id) => `/api/v1/specialist/bookings/${encodeURIComponent(id)}`,
   confirm: (id) => `/api/v1/specialist/bookings/${encodeURIComponent(id)}/confirm`,
   reject: (id) => `/api/v1/specialist/bookings/${encodeURIComponent(id)}/reject`,
   complete: (id) => `/api/v1/specialist/bookings/${encodeURIComponent(id)}/complete`,
   reply: (id) => `/api/v1/specialist/bookings/${encodeURIComponent(id)}/reply`,
+  catalogServices: "/api/v1/services",
+  specialistServices: "/api/v1/specialist-services",
+  specialistService: (id) => `/api/v1/specialist-services/${encodeURIComponent(id)}`,
   clients: "/api/v1/specialist/clients",
   clientStatus: (id) => `/api/v1/specialist/clients/${encodeURIComponent(id)}/status`,
-  clientTag: (id) => `/api/v1/specialist/clients/${encodeURIComponent(id)}/tag`
+  clientTag: (id) => `/api/v1/specialist/clients/${encodeURIComponent(id)}/tag`,
+  calendar: (from, to) => `/api/v1/calendar?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
+  reschedule: (id) => `/api/v1/calendar/${encodeURIComponent(id)}/reschedule`,
+  cancelCalendar: (id) => `/api/v1/calendar/${encodeURIComponent(id)}`,
+  kanban: (date) => `/api/v1/kanban?date=${encodeURIComponent(date)}`,
+  kanbanMove: (id) => `/api/v1/kanban/${encodeURIComponent(id)}/move`
 };
 
 const dashboardState = {
   route: "bookings",
   cache: new Map(),
   bookingFilters: { status: "", date: "", search: "" },
+  editingSpecialistServiceId: "",
+  calendarView: "month",
+  calendarDate: todayIso(),
+  kanbanDate: todayIso(),
   token: localStorage.getItem("serviceBookingAccessToken") || ""
 };
 
@@ -59,7 +73,7 @@ function initDashboard() {
 
 function getRouteFromLocation() {
   const route = new URLSearchParams(location.search).get("section");
-  return route === "clients" ? "clients" : "bookings";
+  return ["profile", "bookings", "clients", "services", "calendar", "kanban"].includes(route) ? route : "bookings";
 }
 
 function navigate(route) {
@@ -79,6 +93,7 @@ async function login(event) {
     const auth = await requestJson(dashboardApi.login, { method: "POST", body: payload, auth: false });
     dashboardState.token = auth.accessToken;
     localStorage.setItem("serviceBookingAccessToken", auth.accessToken);
+    localStorage.setItem("serviceBookingRefreshToken", auth.refreshToken);
     dashboardEls.loginPanel.hidden = true;
     dashboardState.cache.clear();
     await loadRoute(true);
@@ -91,6 +106,7 @@ function logout() {
   dashboardState.token = "";
   dashboardState.cache.clear();
   localStorage.removeItem("serviceBookingAccessToken");
+  localStorage.removeItem("serviceBookingRefreshToken");
   loadRoute(true);
 }
 
@@ -106,8 +122,16 @@ async function loadRoute(force) {
   dashboardEls.content.classList.add("is-transitioning");
   setTimeout(async () => {
     try {
-      if (dashboardState.route === "clients") {
+      if (dashboardState.route === "profile") {
+        await renderProfile(force);
+      } else if (dashboardState.route === "clients") {
         await renderClients(force);
+      } else if (dashboardState.route === "services") {
+        await renderSpecialistServices(force);
+      } else if (dashboardState.route === "calendar") {
+        await renderCalendar(force);
+      } else if (dashboardState.route === "kanban") {
+        await renderKanban(force);
       } else {
         await renderBookings(force);
       }
@@ -124,10 +148,131 @@ async function loadRoute(force) {
 }
 
 function updateChrome() {
-  const isClients = dashboardState.route === "clients";
-  dashboardEls.title.textContent = isClients ? "Клиентская база" : "Управление заявками";
-  dashboardEls.label.textContent = isClients ? "Клиенты" : "Заявки";
+  const titles = {
+    profile: ["Профиль", "Профиль специалиста"],
+    bookings: ["Заявки", "Управление заявками"],
+    clients: ["Клиенты", "Клиентская база"],
+    services: ["Услуги", "Предоставляемые услуги"],
+    calendar: ["Календарь", "Расписание"],
+    kanban: ["Kanban", "Доска заявок"]
+  };
+  const [label, title] = titles[dashboardState.route] || titles.bookings;
+  dashboardEls.title.textContent = title;
+  dashboardEls.label.textContent = label;
   dashboardEls.nav.forEach((button) => button.classList.toggle("active", button.dataset.route === dashboardState.route));
+}
+
+async function renderProfile(force) {
+  dashboardEls.content.innerHTML = `<div class="empty-state">Загрузка...</div>`;
+  const [profile, locations] = await Promise.all([
+    getCached("profile", dashboardApi.profile, force),
+    getCached("locations", dashboardApi.locations, force)
+  ]);
+
+  dashboardEls.content.innerHTML = `
+    <form class="profile-editor" id="profile-form">
+      <div class="section-title">
+        <h2>Основные данные</h2>
+        <span class="muted-cell">${escapeDashboardHtml(profile.email)}</span>
+      </div>
+      <div class="two-column profile-grid">
+        <div class="field-group">
+          <label for="profile-full-name">ФИО</label>
+          <input id="profile-full-name" type="text" value="${escapeDashboardHtml(profile.fullName)}" required>
+        </div>
+        <div class="field-group">
+          <label for="profile-phone">Телефон</label>
+          <input id="profile-phone" type="tel" value="${escapeDashboardHtml(profile.phone)}" required>
+        </div>
+      </div>
+      <div class="field-group">
+        <label for="profile-venue-name">Название заведения</label>
+        <input id="profile-venue-name" type="text" value="${escapeDashboardHtml(profile.venueName || "")}" maxlength="160">
+      </div>
+
+      <div class="section-title profile-section-title">
+        <h2>Расположение</h2>
+      </div>
+      <div class="field-group">
+        <label for="profile-location-id">Существующая локация</label>
+        <select id="profile-location-id">
+          <option value="">Не выбрано</option>
+          ${locations.map((location) => `
+            <option value="${location.id}"${location.id === profile.locationId ? " selected" : ""}>
+              ${escapeDashboardHtml(location.name)} · ${escapeDashboardHtml(location.address)}
+            </option>`).join("")}
+        </select>
+      </div>
+      <div class="two-column profile-grid">
+        <div class="field-group">
+          <label for="profile-new-location-name">Новая локация</label>
+          <input id="profile-new-location-name" type="text" maxlength="120" placeholder="Например: Центральный офис">
+        </div>
+        <div class="field-group">
+          <label for="profile-new-location-address">Адрес новой локации</label>
+          <input id="profile-new-location-address" type="text" maxlength="250">
+        </div>
+      </div>
+      <div class="field-group">
+        <label for="profile-new-location-description">Описание новой локации</label>
+        <input id="profile-new-location-description" type="text" maxlength="500">
+      </div>
+
+      <button class="primary-button" type="submit">Сохранить профиль</button>
+    </form>`;
+
+  dashboardEls.content.querySelector("#profile-phone").addEventListener("input", (event) => {
+    event.target.value = event.target.value.replace(/[^\d+ ().-]/g, "");
+  });
+  dashboardEls.content.querySelector("#profile-form").addEventListener("submit", submitProfile);
+}
+
+async function submitProfile(event) {
+  event.preventDefault();
+  const fullName = document.querySelector("#profile-full-name").value.trim();
+  const phone = document.querySelector("#profile-phone").value.trim();
+  const venueName = document.querySelector("#profile-venue-name").value.trim();
+  const locationSelect = document.querySelector("#profile-location-id");
+  const newLocationName = document.querySelector("#profile-new-location-name").value.trim();
+  const newLocationAddress = document.querySelector("#profile-new-location-address").value.trim();
+  const newLocationDescription = document.querySelector("#profile-new-location-description").value.trim();
+  let locationId = locationSelect.value || null;
+
+  try {
+    if (newLocationName || newLocationAddress || newLocationDescription) {
+      if (!newLocationName || !newLocationAddress) {
+        showDashboardToast("Для новой локации заполните название и адрес.", true);
+        return;
+      }
+
+      const createdLocation = await requestJson(dashboardApi.locations, {
+        method: "POST",
+        body: {
+          name: newLocationName,
+          address: newLocationAddress,
+          description: newLocationDescription || null
+        }
+      });
+      locationId = createdLocation.id;
+    }
+
+    await requestJson(dashboardApi.profile, {
+      method: "PUT",
+      body: {
+        fullName,
+        phone,
+        venueName: venueName || null,
+        locationId
+      }
+    });
+
+    dashboardState.cache.delete("profile");
+    dashboardState.cache.delete("locations");
+    showDashboardToast("Профиль сохранен.", false);
+    await renderProfile(true);
+  } catch (error) {
+    showDashboardToast(error.message, true);
+  }
 }
 
 async function renderBookings(force) {
@@ -245,6 +390,401 @@ function renderClientRow(client) {
     </tr>`;
 }
 
+async function renderSpecialistServices(force) {
+  dashboardEls.content.innerHTML = `<div class="empty-state">Загрузка...</div>`;
+  const [catalogServices, specialistServices] = await Promise.all([
+    getCached("catalog-services", dashboardApi.catalogServices, force),
+    getCached("specialist-services", dashboardApi.specialistServices, force)
+  ]);
+
+  dashboardEls.content.innerHTML = `
+    <section class="service-manager">
+      <form class="service-editor" id="specialist-service-form">
+        <input id="specialist-service-id" type="hidden">
+        <div class="section-title">
+          <h2>Услуга специалиста</h2>
+          <button type="button" class="secondary-button" id="service-form-reset">Сбросить</button>
+        </div>
+        <div class="two-column service-editor-grid">
+          <div class="field-group">
+            <label for="specialist-service-select">Категория услуги</label>
+            <select id="specialist-service-select">
+              <option value="">Выберите из каталога</option>
+              ${catalogServices.map((service) => `<option value="${service.id}">${escapeDashboardHtml(service.name)}</option>`).join("")}
+            </select>
+          </div>
+          <div class="field-group">
+            <label for="new-catalog-service-name">Новая категория</label>
+            <input id="new-catalog-service-name" type="text" maxlength="120" placeholder="Например: Консультация">
+          </div>
+        </div>
+        <div class="field-group">
+          <label for="new-catalog-service-description">Описание новой категории</label>
+          <input id="new-catalog-service-description" type="text" maxlength="500">
+        </div>
+        <div class="two-column service-editor-grid">
+          <div class="field-group">
+            <label for="specialist-service-price">Цена</label>
+            <input id="specialist-service-price" type="number" min="1" step="0.01" required>
+          </div>
+          <div class="field-group">
+            <label for="specialist-service-duration">Длительность, мин</label>
+            <input id="specialist-service-duration" type="number" min="1" step="1" required>
+          </div>
+        </div>
+        <button class="primary-button" id="specialist-service-submit" type="submit">Добавить услугу</button>
+      </form>
+
+      <div class="data-table-wrap">
+        <table class="data-table services-table">
+          <thead>
+            <tr><th>Услуга</th><th>Цена</th><th>Длительность</th><th>Действия</th></tr>
+          </thead>
+          <tbody>${specialistServices.map(renderSpecialistServiceRow).join("") || `<tr><td colspan="4">Услуги специалиста еще не настроены.</td></tr>`}</tbody>
+        </table>
+      </div>
+    </section>`;
+
+  const form = dashboardEls.content.querySelector("#specialist-service-form");
+  form.addEventListener("submit", submitSpecialistService);
+  dashboardEls.content.querySelector("#service-form-reset").addEventListener("click", resetSpecialistServiceForm);
+  dashboardEls.content.querySelectorAll("[data-service-edit]").forEach((button) => {
+    button.addEventListener("click", () => editSpecialistService(button.dataset.serviceEdit));
+  });
+  dashboardEls.content.querySelectorAll("[data-service-delete]").forEach((button) => {
+    button.addEventListener("click", () => deleteSpecialistService(button.dataset.serviceDelete));
+  });
+}
+
+function renderSpecialistServiceRow(service) {
+  return `
+    <tr data-specialist-service-row="${service.id}">
+      <td>${escapeDashboardHtml(service.serviceName || "Без названия")}</td>
+      <td>${formatDashboardMoney(service.price)}</td>
+      <td>${service.durationMinutes} мин</td>
+      <td>
+        <div class="row-actions">
+          <button type="button" class="table-action" data-service-edit="${service.id}">Редактировать</button>
+          <button type="button" class="table-action" data-service-delete="${service.id}">Удалить</button>
+        </div>
+      </td>
+    </tr>`;
+}
+
+async function submitSpecialistService(event) {
+  event.preventDefault();
+  const serviceIdInput = document.querySelector("#specialist-service-id");
+  const catalogSelect = document.querySelector("#specialist-service-select");
+  const newNameInput = document.querySelector("#new-catalog-service-name");
+  const newDescriptionInput = document.querySelector("#new-catalog-service-description");
+  const priceInput = document.querySelector("#specialist-service-price");
+  const durationInput = document.querySelector("#specialist-service-duration");
+  const specialistServiceId = serviceIdInput.value;
+  let serviceId = catalogSelect.value;
+
+  try {
+    if (newNameInput.value.trim()) {
+      const createdService = await requestJson(dashboardApi.catalogServices, {
+        method: "POST",
+        body: {
+          name: newNameInput.value.trim(),
+          description: newDescriptionInput.value.trim() || null
+        }
+      });
+      serviceId = createdService.id;
+    }
+
+    if (!serviceId) {
+      showDashboardToast("Выберите услугу из каталога или создайте новую категорию.", true);
+      return;
+    }
+
+    const payload = {
+      serviceId,
+      price: Number(priceInput.value),
+      durationMinutes: Number(durationInput.value)
+    };
+    const url = specialistServiceId
+      ? dashboardApi.specialistService(specialistServiceId)
+      : dashboardApi.specialistServices;
+    const method = specialistServiceId ? "PUT" : "POST";
+
+    await requestJson(url, { method, body: payload });
+    dashboardState.cache.delete("specialist-services");
+    dashboardState.cache.delete("catalog-services");
+    dashboardState.editingSpecialistServiceId = "";
+    await renderSpecialistServices(true);
+    showDashboardToast("Услуга сохранена.", false);
+  } catch (error) {
+    showDashboardToast(error.message, true);
+  }
+}
+
+async function editSpecialistService(specialistServiceId) {
+  const specialistServices = await getCached("specialist-services", dashboardApi.specialistServices, false);
+  const service = specialistServices.find((item) => item.id === specialistServiceId);
+  if (!service) {
+    showDashboardToast("Услуга не найдена.", true);
+    return;
+  }
+
+  dashboardState.editingSpecialistServiceId = specialistServiceId;
+  document.querySelector("#specialist-service-id").value = service.id;
+  document.querySelector("#specialist-service-select").value = service.serviceId;
+  document.querySelector("#new-catalog-service-name").value = "";
+  document.querySelector("#new-catalog-service-description").value = "";
+  document.querySelector("#specialist-service-price").value = service.price;
+  document.querySelector("#specialist-service-duration").value = service.durationMinutes;
+  document.querySelector("#specialist-service-submit").textContent = "Сохранить изменения";
+}
+
+async function deleteSpecialistService(specialistServiceId) {
+  if (!window.confirm("Удалить услугу специалиста?")) {
+    return;
+  }
+
+  try {
+    await requestJson(dashboardApi.specialistService(specialistServiceId), { method: "DELETE" });
+    dashboardState.cache.delete("specialist-services");
+    await renderSpecialistServices(true);
+    showDashboardToast("Услуга удалена.", false);
+  } catch (error) {
+    showDashboardToast(error.message, true);
+  }
+}
+
+function resetSpecialistServiceForm() {
+  document.querySelector("#specialist-service-id").value = "";
+  document.querySelector("#specialist-service-select").value = "";
+  document.querySelector("#new-catalog-service-name").value = "";
+  document.querySelector("#new-catalog-service-description").value = "";
+  document.querySelector("#specialist-service-price").value = "";
+  document.querySelector("#specialist-service-duration").value = "";
+  document.querySelector("#specialist-service-submit").textContent = "Добавить услугу";
+}
+
+async function renderCalendar(force) {
+  dashboardEls.content.innerHTML = `<div class="empty-state">Загрузка...</div>`;
+  const range = getCalendarRange();
+  const cacheKey = `calendar:${dashboardState.calendarView}:${dashboardState.calendarDate}`;
+  const events = await getCached(cacheKey, dashboardApi.calendar(range.from, range.to), force);
+
+  dashboardEls.content.innerHTML = `
+    <div class="calendar-toolbar">
+      <div class="segmented-control" role="tablist" aria-label="Вид календаря">
+        <button type="button" class="segment-button${dashboardState.calendarView === "month" ? " active" : ""}" data-calendar-view="month">Месяц</button>
+        <button type="button" class="segment-button${dashboardState.calendarView === "week" ? " active" : ""}" data-calendar-view="week">Неделя</button>
+        <button type="button" class="segment-button${dashboardState.calendarView === "day" ? " active" : ""}" data-calendar-view="day">День</button>
+      </div>
+      <div class="calendar-nav">
+        <button type="button" class="secondary-button" data-calendar-shift="-1">Назад</button>
+        <input id="calendar-date" type="date" value="${dashboardState.calendarDate}">
+        <button type="button" class="secondary-button" data-calendar-shift="1">Вперед</button>
+      </div>
+    </div>
+    <div class="calendar-heading">${escapeDashboardHtml(formatCalendarRange(range))}</div>
+    ${renderCalendarBody(events, range)}`;
+
+  dashboardEls.content.querySelectorAll("[data-calendar-view]").forEach((button) => {
+    button.addEventListener("click", () => {
+      dashboardState.calendarView = button.dataset.calendarView;
+      renderCalendar(true);
+    });
+  });
+  dashboardEls.content.querySelectorAll("[data-calendar-shift]").forEach((button) => {
+    button.addEventListener("click", () => {
+      shiftCalendar(Number(button.dataset.calendarShift));
+      renderCalendar(true);
+    });
+  });
+  dashboardEls.content.querySelector("#calendar-date").addEventListener("change", (event) => {
+    dashboardState.calendarDate = event.target.value || todayIso();
+    renderCalendar(true);
+  });
+  dashboardEls.content.querySelectorAll("[data-calendar-reschedule]").forEach((button) => {
+    button.addEventListener("click", () => openRescheduleDialog(button.dataset.calendarReschedule));
+  });
+  dashboardEls.content.querySelectorAll("[data-calendar-cancel]").forEach((button) => {
+    button.addEventListener("click", () => cancelCalendarBooking(button.dataset.calendarCancel));
+  });
+}
+
+function renderCalendarBody(events, range) {
+  if (dashboardState.calendarView === "day") {
+    return `
+      <div class="calendar-day-column">
+        ${renderCalendarEvents(events.filter((event) => event.date === dashboardState.calendarDate))}
+      </div>`;
+  }
+
+  const days = dashboardState.calendarView === "week"
+    ? daysBetween(range.from, range.to)
+    : daysBetween(startOfWeek(range.from), endOfWeek(range.to));
+  const className = dashboardState.calendarView === "week" ? "calendar-grid week-view" : "calendar-grid month-view";
+  return `
+    <div class="${className}">
+      ${days.map((date) => {
+        const dayEvents = events.filter((event) => event.date === date);
+        const isOutsideMonth = dashboardState.calendarView === "month"
+          && parseIsoDate(date).getMonth() !== parseIsoDate(dashboardState.calendarDate).getMonth();
+        return `
+          <section class="calendar-cell${isOutsideMonth ? " muted-day" : ""}">
+            <header>${escapeDashboardHtml(formatShortDate(date))}</header>
+            ${renderCalendarEvents(dayEvents)}
+          </section>`;
+      }).join("")}
+    </div>`;
+}
+
+function renderCalendarEvents(events) {
+  return events
+    .map((event) => `
+      <article class="calendar-event status-border-${event.status}">
+        <div>
+          <strong>${escapeDashboardHtml(event.startTime.slice(0, 5))}-${escapeDashboardHtml(event.endTime.slice(0, 5))}</strong>
+          <span>${escapeDashboardHtml(event.clientName)}</span>
+          <small>${escapeDashboardHtml(event.services.map((service) => service.serviceName).join(", ") || "Без услуги")}</small>
+        </div>
+        <div class="row-actions">
+          <button type="button" class="table-action" data-calendar-reschedule="${event.id}">Перенести</button>
+          <button type="button" class="table-action" data-calendar-cancel="${event.id}">Удалить</button>
+        </div>
+      </article>`)
+    .join("") || `<div class="calendar-empty">Нет записей</div>`;
+}
+
+async function openRescheduleDialog(bookingId) {
+  const range = getCalendarRange();
+  const events = await getCached(`calendar:${dashboardState.calendarView}:${dashboardState.calendarDate}`, dashboardApi.calendar(range.from, range.to), false);
+  const event = events.find((item) => item.id === bookingId);
+  if (!event) {
+    showDashboardToast("Запись не найдена.", true);
+    return;
+  }
+
+  dashboardEls.dialogTitle.textContent = "Перенести запись";
+  dashboardEls.dialogBody.innerHTML = `
+    <div class="two-column">
+      <div class="field-group"><label for="reschedule-date">Дата</label><input id="reschedule-date" type="date" value="${event.date}" required></div>
+      <div class="field-group"><label for="reschedule-time">Время</label><input id="reschedule-time" type="time" value="${event.startTime.slice(0, 5)}" required></div>
+    </div>`;
+  dashboardEls.actionForm.onsubmit = async (submitEvent) => {
+    submitEvent.preventDefault();
+    await submitReschedule(bookingId);
+  };
+  dashboardEls.dialog.showModal();
+}
+
+async function submitReschedule(bookingId) {
+  try {
+    await requestJson(dashboardApi.reschedule(bookingId), {
+      method: "PUT",
+      body: {
+        date: document.querySelector("#reschedule-date")?.value,
+        time: normalizeTime(document.querySelector("#reschedule-time")?.value)
+      }
+    });
+    closeDialog();
+    dashboardState.cache.clear();
+    await renderCalendar(true);
+    showDashboardToast("Запись перенесена.", false);
+  } catch (error) {
+    showDashboardToast(error.message, true);
+  }
+}
+
+async function cancelCalendarBooking(bookingId) {
+  if (!window.confirm("Удалить запись из календаря?")) {
+    return;
+  }
+
+  try {
+    await requestJson(dashboardApi.cancelCalendar(bookingId), { method: "DELETE" });
+    dashboardState.cache.clear();
+    await renderCalendar(true);
+    showDashboardToast("Запись удалена из календаря.", false);
+  } catch (error) {
+    showDashboardToast(error.message, true);
+  }
+}
+
+async function renderKanban(force) {
+  dashboardEls.content.innerHTML = `<div class="empty-state">Загрузка...</div>`;
+  const board = await getCached(`kanban:${dashboardState.kanbanDate}`, dashboardApi.kanban(dashboardState.kanbanDate), force);
+  dashboardEls.content.innerHTML = `
+    <div class="table-toolbar kanban-toolbar">
+      <input id="kanban-date" type="date" value="${dashboardState.kanbanDate}">
+    </div>
+    <div class="kanban-board">
+      ${board.columns.map(renderKanbanColumn).join("")}
+    </div>`;
+
+  dashboardEls.content.querySelector("#kanban-date").addEventListener("change", (event) => {
+    dashboardState.kanbanDate = event.target.value || todayIso();
+    renderKanban(true);
+  });
+  bindKanbanDrag();
+}
+
+function renderKanbanColumn(column) {
+  return `
+    <section class="kanban-column" data-kanban-status="${column.status}">
+      <header>
+        <span>${statusText(column.status)}</span>
+        <strong>${column.items.length}</strong>
+      </header>
+      <div class="kanban-column-body" data-drop-status="${column.status}">
+        ${column.items.map(renderKanbanCard).join("") || `<div class="calendar-empty">Нет заявок</div>`}
+      </div>
+    </section>`;
+}
+
+function renderKanbanCard(card) {
+  return `
+    <article class="kanban-card" draggable="true" data-kanban-card="${card.id}">
+      <strong>${escapeDashboardHtml(card.clientName)}</strong>
+      <span>${escapeDashboardHtml(card.time.slice(0, 5))} · ${formatDashboardMoney(card.totalPrice)}</span>
+      <small>${escapeDashboardHtml(card.servicesSummary || "Без услуги")}</small>
+    </article>`;
+}
+
+function bindKanbanDrag() {
+  dashboardEls.content.querySelectorAll("[data-kanban-card]").forEach((card) => {
+    card.addEventListener("dragstart", (event) => {
+      event.dataTransfer.setData("text/plain", card.dataset.kanbanCard);
+      event.dataTransfer.effectAllowed = "move";
+    });
+  });
+
+  dashboardEls.content.querySelectorAll("[data-drop-status]").forEach((column) => {
+    column.addEventListener("dragover", (event) => {
+      event.preventDefault();
+      column.classList.add("drag-over");
+    });
+    column.addEventListener("dragleave", () => column.classList.remove("drag-over"));
+    column.addEventListener("drop", async (event) => {
+      event.preventDefault();
+      column.classList.remove("drag-over");
+      const bookingId = event.dataTransfer.getData("text/plain");
+      await moveKanbanCard(bookingId, Number(column.dataset.dropStatus));
+    });
+  });
+}
+
+async function moveKanbanCard(bookingId, status) {
+  try {
+    await requestJson(dashboardApi.kanbanMove(bookingId), {
+      method: "PUT",
+      body: { status }
+    });
+    dashboardState.cache.clear();
+    await renderKanban(true);
+    showDashboardToast("Статус заявки обновлен.", false);
+  } catch (error) {
+    showDashboardToast(error.message, true);
+  }
+}
+
 async function openBookingAction(action, bookingId) {
   const booking = await requestJson(dashboardApi.booking(bookingId));
   dashboardEls.actionForm.onsubmit = async (event) => {
@@ -357,6 +897,90 @@ async function requestJson(url, options = {}) {
   }
 
   return data;
+}
+
+function getCalendarRange() {
+  const anchor = parseIsoDate(dashboardState.calendarDate);
+  if (dashboardState.calendarView === "day") {
+    return { from: dashboardState.calendarDate, to: dashboardState.calendarDate };
+  }
+
+  if (dashboardState.calendarView === "week") {
+    return {
+      from: startOfWeek(formatIsoDate(anchor)),
+      to: endOfWeek(formatIsoDate(anchor))
+    };
+  }
+
+  return {
+    from: formatIsoDate(new Date(anchor.getFullYear(), anchor.getMonth(), 1)),
+    to: formatIsoDate(new Date(anchor.getFullYear(), anchor.getMonth() + 1, 0))
+  };
+}
+
+function shiftCalendar(direction) {
+  const anchor = parseIsoDate(dashboardState.calendarDate);
+  if (dashboardState.calendarView === "day") {
+    anchor.setDate(anchor.getDate() + direction);
+  } else if (dashboardState.calendarView === "week") {
+    anchor.setDate(anchor.getDate() + direction * 7);
+  } else {
+    anchor.setMonth(anchor.getMonth() + direction);
+  }
+
+  dashboardState.calendarDate = formatIsoDate(anchor);
+}
+
+function daysBetween(from, to) {
+  const dates = [];
+  const current = parseIsoDate(from);
+  const end = parseIsoDate(to);
+  while (current <= end) {
+    dates.push(formatIsoDate(current));
+    current.setDate(current.getDate() + 1);
+  }
+
+  return dates;
+}
+
+function startOfWeek(isoDate) {
+  const date = parseIsoDate(isoDate);
+  const day = date.getDay() || 7;
+  date.setDate(date.getDate() - day + 1);
+  return formatIsoDate(date);
+}
+
+function endOfWeek(isoDate) {
+  const date = parseIsoDate(startOfWeek(isoDate));
+  date.setDate(date.getDate() + 6);
+  return formatIsoDate(date);
+}
+
+function parseIsoDate(value) {
+  return new Date(`${value}T00:00:00`);
+}
+
+function formatIsoDate(date) {
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+function todayIso() {
+  return formatIsoDate(new Date());
+}
+
+function formatShortDate(value) {
+  return new Intl.DateTimeFormat("ru-RU", { weekday: "short", day: "2-digit", month: "2-digit" })
+    .format(parseIsoDate(value));
+}
+
+function formatCalendarRange(range) {
+  if (range.from === range.to) {
+    return formatShortDate(range.from);
+  }
+
+  return `${formatShortDate(range.from)} - ${formatShortDate(range.to)}`;
 }
 
 function statusText(status) {

@@ -86,6 +86,9 @@ public sealed class Booking
         ConfirmedDate = date;
         ConfirmedTime = time;
         ConfirmedAt = DateTimeOffset.UtcNow;
+        CompletedAt = null;
+        ActualRevenue = null;
+        RejectionReason = null;
     }
 
     public void Reject() => Status = BookingStatus.Rejected;
@@ -116,6 +119,17 @@ public sealed class Booking
 
         SpecialistReply = trimmed;
         RepliedAt = DateTimeOffset.UtcNow;
+    }
+
+    public void Reopen()
+    {
+        Status = BookingStatus.New;
+        ConfirmedAt = null;
+        ConfirmedDate = null;
+        ConfirmedTime = null;
+        CompletedAt = null;
+        ActualRevenue = null;
+        RejectionReason = null;
     }
 
     public void Complete(decimal actualRevenue)

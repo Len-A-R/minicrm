@@ -135,12 +135,28 @@ public sealed class Stage4BookingEndpointTests
         var styles = await client.GetStringAsync("/styles.css");
         var dashboard = await client.GetStringAsync("/dashboard.html");
         var dashboardScript = await client.GetStringAsync("/dashboard.js");
+        var register = await client.GetStringAsync("/register.html");
+        var registerScript = await client.GetStringAsync("/register.js");
 
         Assert.Contains("Бронирование услуги", index);
         Assert.Contains("/api/v1/bookings", script);
+        Assert.Contains("normalizeBookingTime", script);
         Assert.Contains(".step-card.active", styles);
         Assert.Contains("Кабинет специалиста", dashboard);
+        Assert.Contains("data-route=\"profile\"", dashboard);
+        Assert.Contains("data-route=\"services\"", dashboard);
+        Assert.Contains("/api/v1/profile", dashboardScript);
+        Assert.Contains("/api/v1/locations", dashboardScript);
         Assert.Contains("/api/v1/specialist/bookings", dashboardScript);
+        Assert.Contains("/api/v1/specialist-services", dashboardScript);
+        Assert.Contains("/api/v1/calendar", dashboardScript);
+        Assert.Contains("/api/v1/kanban", dashboardScript);
+        Assert.Contains(".profile-editor", styles);
+        Assert.Contains(".service-manager", styles);
+        Assert.Contains(".kanban-board", styles);
+        Assert.Contains(".calendar-grid", styles);
+        Assert.Contains("Регистрация специалиста", register);
+        Assert.Contains("/api/v1/auth/register", registerScript);
     }
 
     private static async Task<BookingSetup> CreatePublicBookingSetupAsync(HttpClient client)

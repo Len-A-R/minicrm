@@ -2,7 +2,9 @@ using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
 using ServiceBooking.Application.Auth;
 using ServiceBooking.Application.Bookings;
+using ServiceBooking.Application.Calendar;
 using ServiceBooking.Application.Catalog;
+using ServiceBooking.Application.Kanban;
 using ServiceBooking.Application.Profile;
 using ServiceBooking.Application.Slots;
 using ServiceBooking.Application.SpecialistBookings;
@@ -22,6 +24,8 @@ public static class DependencyInjection
         services.AddScoped<IProfileService, ProfileService>();
         services.AddScoped<IBookingService, Bookings.BookingService>();
         services.AddScoped<IBookingActionService, BookingActionService>();
+        services.AddScoped<ICalendarService, CalendarService>();
+        services.AddScoped<IKanbanService, KanbanService>();
         services.AddScoped<ISpecialistClientService, SpecialistClientService>();
         services.AddScoped<IClientAutoCreationService, ClientAutoCreationService>();
         services.AddScoped<IPublicSpecialistService, PublicSpecialistService>();

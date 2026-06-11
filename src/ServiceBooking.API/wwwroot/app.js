@@ -357,7 +357,7 @@ async function submitBooking(event) {
     specialistId: state.selectedSpecialistId,
     serviceIds: [...state.selectedServiceIds],
     requestedDate: els.requestedDate.value,
-    requestedTime: state.selectedTime,
+    requestedTime: normalizeBookingTime(state.selectedTime),
     message: els.message.value.trim() || null
   };
 
@@ -374,7 +374,7 @@ async function submitBooking(event) {
     const data = await response.json().catch(() => null);
 
     if (!response.ok) {
-      throw new Error(data?.message || "Заявка не отправлена.");
+      throw new Error(getErrorMessage(data) || "Заявка не отправлена.");
     }
 
     showResult(`Заявка создана. Номер: ${data.id}`, false);
@@ -478,6 +478,19 @@ function formatMoney(value) {
     currency: "RUB",
     maximumFractionDigits: 0
   }).format(value);
+}
+
+function normalizeBookingTime(value) {
+  return value && value.length === 5 ? `${value}:00` : value;
+}
+
+function getErrorMessage(data) {
+  if (data?.message) {
+    return data.message;
+  }
+
+  const firstError = data?.errors && Object.values(data.errors).flat()[0];
+  return firstError || data?.title || "";
 }
 
 function escapeHtml(value) {

@@ -13,8 +13,12 @@
       <h1>Кабинет</h1>
     </div>
     <nav class="dashboard-nav" aria-label="Разделы кабинета">
+      <button type="button" class="dashboard-nav-item" data-route="profile">Профиль</button>
       <button type="button" class="dashboard-nav-item active" data-route="bookings">Заявки</button>
       <button type="button" class="dashboard-nav-item" data-route="clients">Клиенты</button>
+      <button type="button" class="dashboard-nav-item" data-route="services">Услуги</button>
+      <button type="button" class="dashboard-nav-item" data-route="calendar">Календарь</button>
+      <button type="button" class="dashboard-nav-item" data-route="kanban">Kanban</button>
     </nav>
     <button type="button" class="secondary-button" id="logout-button">Выйти</button>
   </aside>
@@ -39,6 +43,7 @@
           <input id="login-password" type="password" autocomplete="current-password" required>
         </div>
         <button class="primary-button" type="submit">Войти</button>
+        <a class="auth-link" href="/register.html">Зарегистрироваться как специалист</a>
       </form>
     </section>
 

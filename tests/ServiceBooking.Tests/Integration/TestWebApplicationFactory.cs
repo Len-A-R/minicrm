@@ -25,7 +25,8 @@ public sealed class TestWebApplicationFactory : WebApplicationFactory<Program>
                 ["Jwt:Audience"] = "ServiceBooking",
                 ["Jwt:SigningKey"] = "ServiceBooking-development-signing-key-change-me",
                 ["Jwt:AccessTokenMinutes"] = "30",
-                ["Jwt:RefreshTokenDays"] = "30"
+                ["Jwt:RefreshTokenDays"] = "30",
+                ["Database:AutoMigrate"] = "false"
             });
         });
 

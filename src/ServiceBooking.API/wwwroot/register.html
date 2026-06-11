@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ServiceBooking · Регистрация специалиста</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body class="auth-body">
+  <main class="auth-shell">
+    <section class="auth-panel" aria-label="Регистрация специалиста">
+      <header class="auth-header">
+        <p class="eyebrow">ServiceBooking</p>
+        <h1>Регистрация специалиста</h1>
+      </header>
+
+      <form id="register-form" class="auth-form" novalidate>
+        <div class="field-group">
+          <label for="register-full-name">ФИО</label>
+          <input id="register-full-name" name="fullName" type="text" autocomplete="name" required>
+          <small class="field-error" id="register-full-name-error"></small>
+        </div>
+
+        <div class="two-column auth-grid">
+          <div class="field-group">
+            <label for="register-email">Email</label>
+            <input id="register-email" name="email" type="email" autocomplete="email" required>
+            <small class="field-error" id="register-email-error"></small>
+          </div>
+          <div class="field-group">
+            <label for="register-phone">Телефон</label>
+            <input id="register-phone" name="phone" type="tel" autocomplete="tel" inputmode="tel" required placeholder="+7 999 123-45-67">
+            <small class="field-error" id="register-phone-error"></small>
+          </div>
+        </div>
+
+        <div class="two-column auth-grid">
+          <div class="field-group">
+            <label for="register-password">Пароль</label>
+            <input id="register-password" name="password" type="password" autocomplete="new-password" required>
+            <small class="field-error" id="register-password-error"></small>
+          </div>
+          <div class="field-group">
+            <label for="register-confirm-password">Подтверждение пароля</label>
+            <input id="register-confirm-password" name="confirmPassword" type="password" autocomplete="new-password" required>
+            <small class="field-error" id="register-confirm-password-error"></small>
+          </div>
+        </div>
+
+        <button class="primary-button" id="register-submit" type="submit" disabled>Зарегистрироваться</button>
+      </form>
+
+      <footer class="auth-footer">
+        <a href="/dashboard.html">Войти в кабинет</a>
+      </footer>
+
+      <div class="result-banner auth-result" id="register-result" role="status" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <script src="/register.js" defer></script>
+</body>
+</html>
