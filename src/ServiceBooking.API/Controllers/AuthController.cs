@@ -25,6 +25,34 @@ public sealed class AuthController(IAuthService authService) : ControllerBase
         return CreatedAtAction(nameof(GetMe), result.Value);
     }
 
+    [HttpPost("register/specialist")]
+    [ProducesResponseType<AuthResponse>(StatusCodes.Status201Created)]
+    [ProducesResponseType<ErrorResponse>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ErrorResponse>(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<AuthResponse>> RegisterSpecialist(
+        RegisterSpecialistRequest request,
+        CancellationToken cancellationToken)
+    {
+        return await Register(request, cancellationToken);
+    }
+
+    [HttpPost("register/client")]
+    [ProducesResponseType<AuthResponse>(StatusCodes.Status201Created)]
+    [ProducesResponseType<ErrorResponse>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ErrorResponse>(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<AuthResponse>> RegisterClient(
+        RegisterClientRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await authService.RegisterClientAsync(request, cancellationToken);
+        if (!result.IsSuccess)
+        {
+            return this.ToErrorResult(result);
+        }
+
+        return Created("api/v1/client/me", result.Value);
+    }
+
     [HttpPost("login")]
     [ProducesResponseType<AuthResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ErrorResponse>(StatusCodes.Status401Unauthorized)]
@@ -45,7 +73,7 @@ public sealed class AuthController(IAuthService authService) : ControllerBase
         return result.IsSuccess ? Ok(result.Value) : this.ToErrorResult(result);
     }
 
-    [Authorize]
+    [Authorize(Roles = "Specialist")]
     [HttpGet("me")]
     [ProducesResponseType<SpecialistMeResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ErrorResponse>(StatusCodes.Status401Unauthorized)]

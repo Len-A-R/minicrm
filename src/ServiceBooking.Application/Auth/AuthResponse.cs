@@ -7,4 +7,11 @@ public sealed record AuthResponse(
     string AccessToken,
     DateTimeOffset AccessTokenExpiresAt,
     string RefreshToken,
-    DateTimeOffset RefreshTokenExpiresAt);
+    DateTimeOffset RefreshTokenExpiresAt)
+{
+    public string Role { get; init; } = "Specialist";
+
+    public Guid? ClientId { get; init; }
+
+    public Guid? AdminId { get; init; }
+}

@@ -38,6 +38,56 @@ public sealed class JwtTokenService(IOptions<JwtOptions> options) : ITokenServic
         return new AccessTokenResult(new JwtSecurityTokenHandler().WriteToken(token), expiresAt);
     }
 
+    public AccessTokenResult CreateClientAccessToken(Client client, DateTimeOffset utcNow)
+    {
+        var expiresAt = utcNow.AddMinutes(_options.AccessTokenMinutes);
+        var claims = new[]
+        {
+            new Claim(JwtRegisteredClaimNames.Sub, client.Id.ToString()),
+            new Claim(ClaimTypes.NameIdentifier, client.Id.ToString()),
+            new Claim(ClaimTypes.Email, client.Email ?? string.Empty),
+            new Claim(ClaimTypes.Name, client.FullName),
+            new Claim(ClaimTypes.Role, "Client")
+        };
+
+        var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.SigningKey));
+        var credentials = new SigningCredentials(signingKey, SecurityAlgorithms.HmacSha256);
+        var token = new JwtSecurityToken(
+            _options.Issuer,
+            _options.Audience,
+            claims,
+            notBefore: utcNow.UtcDateTime,
+            expires: expiresAt.UtcDateTime,
+            signingCredentials: credentials);
+
+        return new AccessTokenResult(new JwtSecurityTokenHandler().WriteToken(token), expiresAt);
+    }
+
+    public AccessTokenResult CreateAdminAccessToken(AdminUser admin, DateTimeOffset utcNow)
+    {
+        var expiresAt = utcNow.AddMinutes(_options.AccessTokenMinutes);
+        var claims = new[]
+        {
+            new Claim(JwtRegisteredClaimNames.Sub, admin.Id.ToString()),
+            new Claim(ClaimTypes.NameIdentifier, admin.Id.ToString()),
+            new Claim(ClaimTypes.Email, admin.Email),
+            new Claim(ClaimTypes.Name, admin.FullName),
+            new Claim(ClaimTypes.Role, "Admin")
+        };
+
+        var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.SigningKey));
+        var credentials = new SigningCredentials(signingKey, SecurityAlgorithms.HmacSha256);
+        var token = new JwtSecurityToken(
+            _options.Issuer,
+            _options.Audience,
+            claims,
+            notBefore: utcNow.UtcDateTime,
+            expires: expiresAt.UtcDateTime,
+            signingCredentials: credentials);
+
+        return new AccessTokenResult(new JwtSecurityTokenHandler().WriteToken(token), expiresAt);
+    }
+
     public RefreshTokenResult CreateRefreshToken(DateTimeOffset utcNow)
     {
         var tokenBytes = RandomNumberGenerator.GetBytes(64);

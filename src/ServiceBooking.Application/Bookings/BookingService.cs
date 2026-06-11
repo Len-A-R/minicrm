@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using ServiceBooking.Application.Admin;
 using ServiceBooking.Application.Common;
 using DomainBooking = ServiceBooking.Domain.Entities.Booking;
 using DomainBookingService = ServiceBooking.Domain.Entities.BookingService;
@@ -8,7 +9,8 @@ namespace ServiceBooking.Application.Bookings;
 public sealed partial class BookingService(
     IBookingRepository bookings,
     IClientAutoCreationService clientAutoCreation,
-    IDateTimeProvider dateTimeProvider) : IBookingService
+    IDateTimeProvider dateTimeProvider,
+    ISubscriptionQuotaService subscriptionQuota) : IBookingService
 {
     public async Task<ServiceResult<BookingResponse>> CreateAsync(
         CreateBookingRequest request,
@@ -26,6 +28,12 @@ public sealed partial class BookingService(
                 ResultStatus.NotFound,
                 "specialist_not_found",
                 "Specialist was not found.");
+        }
+
+        var quota = await subscriptionQuota.CheckBookingQuotaAsync(request.SpecialistId, cancellationToken);
+        if (!quota.IsSuccess)
+        {
+            return ServiceResult<BookingResponse>.Failure(quota.Status, quota.Error!.Code, quota.Error.Message);
         }
 
         var distinctServiceIds = request.ServiceIds

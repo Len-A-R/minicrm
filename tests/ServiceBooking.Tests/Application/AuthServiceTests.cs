@@ -47,6 +47,48 @@ public sealed class AuthServiceTests
         Assert.Equal(ResultStatus.Conflict, result.Status);
     }
 
+    [Fact]
+    public async Task RegisterClientAsync_CreatesClientAndIssuesClientTokens()
+    {
+        var clientRepository = new FakeClientAuthRepository();
+        var service = CreateService(new FakeSpecialistRepository(), clientRepository);
+
+        var result = await service.RegisterClientAsync(new RegisterClientRequest(
+            "Alice Brown",
+            "Alice@Example.com",
+            "+15550909090",
+            "Password1",
+            "Password1"), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Client", result.Value?.Role);
+        Assert.Equal("client-access-token", result.Value?.AccessToken);
+        Assert.Single(clientRepository.Clients);
+        Assert.Equal("alice@example.com", clientRepository.Clients[0].Email);
+        Assert.Equal("hash:Password1", clientRepository.Clients[0].PasswordHash);
+        Assert.Equal("hash:refresh-token", clientRepository.Clients[0].RefreshTokenHash);
+    }
+
+    [Fact]
+    public async Task RegisterClientAsync_AttachesCredentialsToExistingPhoneClient()
+    {
+        var clientRepository = new FakeClientAuthRepository();
+        clientRepository.Clients.Add(new Client("Alice Brown", "+15550909090"));
+        var service = CreateService(new FakeSpecialistRepository(), clientRepository);
+
+        var result = await service.RegisterClientAsync(new RegisterClientRequest(
+            "Alice B",
+            "alice@example.com",
+            "+15550909090",
+            "Password1",
+            "Password1"), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Single(clientRepository.Clients);
+        Assert.Equal("Alice B", clientRepository.Clients[0].FullName);
+        Assert.Equal("alice@example.com", clientRepository.Clients[0].Email);
+    }
+
     [Theory]
     [InlineData("bad-email", "Password1", "Password1", "invalid_email")]
     [InlineData("jane@example.com", "password1", "password1", "weak_password")]
@@ -99,6 +141,34 @@ public sealed class AuthServiceTests
     }
 
     [Fact]
+    public async Task LoginAsync_IssuesClientTokensForClientCredentials()
+    {
+        var clientRepository = new FakeClientAuthRepository();
+        clientRepository.Clients.Add(new Client("Alice Brown", "+15550909090", "alice@example.com", "hash:Password1"));
+        var service = CreateService(new FakeSpecialistRepository(), clientRepository);
+
+        var result = await service.LoginAsync(new LoginRequest("alice@example.com", "Password1"), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Client", result.Value?.Role);
+        Assert.Equal("client-access-token", result.Value?.AccessToken);
+    }
+
+    [Fact]
+    public async Task LoginAsync_IssuesAdminTokenForDefaultAdminCredentials()
+    {
+        var adminRepository = new FakeAdminAuthLookupRepository();
+        adminRepository.Admins.Add(new AdminUser("Platform Admin", "admin@minicrm", "hash:Admin12345"));
+        var service = CreateService(new FakeSpecialistRepository(), admins: adminRepository);
+
+        var result = await service.LoginAsync(new LoginRequest("admin@minicrm", "Admin12345"), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Admin", result.Value?.Role);
+        Assert.Equal("admin-access-token", result.Value?.AccessToken);
+    }
+
+    [Fact]
     public async Task RefreshAsync_RotatesActiveRefreshToken()
     {
         var repository = new FakeSpecialistRepository();
@@ -144,10 +214,15 @@ public sealed class AuthServiceTests
         Assert.Equal(ResultStatus.NotFound, result.Status);
     }
 
-    private static AuthService CreateService(FakeSpecialistRepository repository)
+    private static AuthService CreateService(
+        FakeSpecialistRepository repository,
+        FakeClientAuthRepository? clients = null,
+        FakeAdminAuthLookupRepository? admins = null)
     {
         return new AuthService(
             repository,
+            clients ?? new FakeClientAuthRepository(),
+            admins ?? new FakeAdminAuthLookupRepository(),
             new FakePasswordHasher(),
             new FakeTokenService(),
             new FakeDateTimeProvider(new DateTimeOffset(2026, 6, 11, 0, 0, 0, TimeSpan.Zero)));
@@ -198,6 +273,16 @@ public sealed class AuthServiceTests
             return new AccessTokenResult("access-token", utcNow.AddMinutes(30));
         }
 
+        public AccessTokenResult CreateClientAccessToken(Client client, DateTimeOffset utcNow)
+        {
+            return new AccessTokenResult("client-access-token", utcNow.AddMinutes(30));
+        }
+
+        public AccessTokenResult CreateAdminAccessToken(AdminUser admin, DateTimeOffset utcNow)
+        {
+            return new AccessTokenResult("admin-access-token", utcNow.AddMinutes(30));
+        }
+
         public RefreshTokenResult CreateRefreshToken(DateTimeOffset utcNow)
         {
             return new RefreshTokenResult("refresh-token", utcNow.AddDays(30));
@@ -207,5 +292,61 @@ public sealed class AuthServiceTests
     private sealed class FakeDateTimeProvider(DateTimeOffset utcNow) : IDateTimeProvider
     {
         public DateTimeOffset UtcNow { get; } = utcNow;
+    }
+
+    private sealed class FakeClientAuthRepository : IClientAuthRepository
+    {
+        public List<Client> Clients { get; } = [];
+
+        public Task<bool> EmailExistsAsync(string normalizedEmail, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Clients.Any(client => client.Email == normalizedEmail));
+        }
+
+        public Task<Client?> GetByEmailAsync(string normalizedEmail, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Clients.SingleOrDefault(client => client.Email == normalizedEmail));
+        }
+
+        public Task<Client?> GetByPhoneAsync(string phone, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Clients.SingleOrDefault(client => client.Phone == phone));
+        }
+
+        public Task<Client?> GetByIdAsync(Guid clientId, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Clients.SingleOrDefault(client => client.Id == clientId));
+        }
+
+        public Task AddAsync(Client client, CancellationToken cancellationToken)
+        {
+            Clients.Add(client);
+            return Task.CompletedTask;
+        }
+
+        public Task SaveChangesAsync(CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class FakeAdminAuthLookupRepository : IAdminAuthLookupRepository
+    {
+        public List<AdminUser> Admins { get; } = [];
+
+        public Task<AdminUser?> GetAdminByEmailAsync(string normalizedEmail, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Admins.SingleOrDefault(admin => admin.Email == normalizedEmail));
+        }
+
+        public Task<bool> AdminEmailExistsAsync(string normalizedEmail, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Admins.Any(admin => admin.Email == normalizedEmail));
+        }
+
+        public Task SaveChangesAsync(CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
     }
 }

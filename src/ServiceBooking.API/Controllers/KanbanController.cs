@@ -5,7 +5,7 @@ using ServiceBooking.Application.Kanban;
 namespace ServiceBooking.API.Controllers;
 
 [ApiController]
-[Authorize]
+[Authorize(Roles = "Specialist")]
 [Route("api/v1/kanban")]
 public sealed class KanbanController(IKanbanService kanbanService) : ControllerBase
 {

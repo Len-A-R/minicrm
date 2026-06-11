@@ -97,6 +97,16 @@ public sealed class ControllerMappingTests
                 "Not used."));
         }
 
+        public Task<ServiceResult<AuthResponse>> RegisterClientAsync(
+            RegisterClientRequest request,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(ServiceResult<AuthResponse>.Failure(
+                ResultStatus.Validation,
+                "not_used",
+                "Not used."));
+        }
+
         public Task<ServiceResult<AuthResponse>> LoginAsync(LoginRequest request, CancellationToken cancellationToken)
         {
             return Task.FromResult(ServiceResult<AuthResponse>.Failure(

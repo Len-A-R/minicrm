@@ -5,6 +5,8 @@ using Microsoft.Extensions.DependencyInjection;
 using ServiceBooking.Application.Auth;
 using ServiceBooking.Application.Bookings;
 using ServiceBooking.Application.Catalog;
+using ServiceBooking.Application.Clients;
+using ServiceBooking.Application.SpecialistBookings;
 using ServiceBooking.Application.SpecialistServices;
 using ServiceBooking.Domain.Entities;
 using ServiceBooking.Infrastructure.Persistence;
@@ -125,6 +127,62 @@ public sealed class Stage4BookingEndpointTests
     }
 
     [Fact]
+    public async Task ClientPortalFlow_UsesClientProfileAndReturnsHistoryAndNotifications()
+    {
+        using var factory = new TestWebApplicationFactory();
+        using var client = factory.CreateClient();
+        var setup = await CreatePublicBookingSetupAsync(client);
+
+        var registerClientResponse = await client.PostAsJsonAsync("/api/v1/auth/register/client", new RegisterClientRequest(
+            "Alice Brown",
+            $"{Guid.NewGuid():N}@example.com",
+            "+15550909090",
+            "Password1",
+            "Password1"));
+        registerClientResponse.EnsureSuccessStatusCode();
+        var clientAuth = await registerClientResponse.Content.ReadFromJsonAsync<AuthResponse>();
+        Assert.Equal("Client", clientAuth!.Role);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", clientAuth.AccessToken);
+        var me = await client.GetFromJsonAsync<ClientMeResponse>("/api/v1/client/me");
+        var updateProfileResponse = await client.PutAsJsonAsync("/api/v1/client/me", new UpdateClientProfileRequest(
+            "Alice Updated",
+            "+15550909091"));
+        updateProfileResponse.EnsureSuccessStatusCode();
+        var updatedMe = await updateProfileResponse.Content.ReadFromJsonAsync<ClientMeResponse>();
+        var bookingResponse = await client.PostAsJsonAsync("/api/v1/client/bookings", new CreateClientBookingRequest(
+            setup.SpecialistId,
+            [setup.ServiceId],
+            new DateOnly(2026, 7, 12),
+            new TimeOnly(13, 30),
+            "Need a callback"));
+        bookingResponse.EnsureSuccessStatusCode();
+        var booking = await bookingResponse.Content.ReadFromJsonAsync<BookingResponse>();
+        var history = await client.GetFromJsonAsync<IReadOnlyCollection<ClientBookingHistoryResponse>>("/api/v1/client/bookings");
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", setup.SpecialistAccessToken);
+        var replyResponse = await client.PostAsJsonAsync(
+            $"/api/v1/specialist/bookings/{booking!.Id}/reply",
+            new ReplyBookingRequest("Подтверждаю заявку, ожидаю вас."));
+        replyResponse.EnsureSuccessStatusCode();
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", clientAuth.AccessToken);
+        var notifications = await client.GetFromJsonAsync<IReadOnlyCollection<ClientNotificationResponse>>("/api/v1/client/notifications");
+
+        Assert.Equal("Alice Brown", me!.FullName);
+        Assert.Equal("+15550909090", me.Phone);
+        Assert.Equal("Alice Updated", updatedMe!.FullName);
+        Assert.Equal("+15550909091", updatedMe.Phone);
+        Assert.Equal("Alice Updated", booking!.ClientName);
+        Assert.Equal("+15550909091", booking.ClientPhone);
+        var historyItem = Assert.Single(history!);
+        var notification = Assert.Single(notifications!);
+        Assert.Equal("Jane Doe", historyItem.SpecialistName);
+        Assert.Equal(150m, historyItem.TotalPrice);
+        Assert.Equal("Подтверждаю заявку, ожидаю вас.", notification.Reply);
+    }
+
+    [Fact]
     public async Task StaticBookingFrontend_IsServed()
     {
         using var factory = new TestWebApplicationFactory();
@@ -135,6 +193,10 @@ public sealed class Stage4BookingEndpointTests
         var styles = await client.GetStringAsync("/styles.css");
         var dashboard = await client.GetStringAsync("/dashboard.html");
         var dashboardScript = await client.GetStringAsync("/dashboard.js");
+        var login = await client.GetStringAsync("/login");
+        var loginScript = await client.GetStringAsync("/login.js");
+        var clientPortal = await client.GetStringAsync("/client.html");
+        var clientScript = await client.GetStringAsync("/client.js");
         var register = await client.GetStringAsync("/register.html");
         var registerScript = await client.GetStringAsync("/register.js");
 
@@ -143,10 +205,20 @@ public sealed class Stage4BookingEndpointTests
         Assert.Contains("normalizeBookingTime", script);
         Assert.Contains(".step-card.active", styles);
         Assert.Contains("Кабинет специалиста", dashboard);
-        Assert.Contains("data-route=\"profile\"", dashboard);
-        Assert.Contains("data-route=\"services\"", dashboard);
-        Assert.Contains("data-route=\"reports\"", dashboard);
+        Assert.Contains("id=\"dashboard-sidebar\" hidden", dashboard);
+        Assert.Contains("id=\"dashboard-nav\"", dashboard);
         Assert.Contains("chart.js", dashboard);
+        Assert.DoesNotContain("dashboard-topbar", dashboard);
+        Assert.DoesNotContain("id=\"refresh-button\"", dashboard);
+        Assert.DoesNotContain("id=\"logout-button\"", dashboard);
+        Assert.Contains("specialistMenuItems", dashboardScript);
+        Assert.Contains("route: \"profile\"", dashboardScript);
+        Assert.Contains("route: \"services\"", dashboardScript);
+        Assert.Contains("route: \"reports\"", dashboardScript);
+        Assert.Contains("startDashboardAutoRefresh", dashboardScript);
+        Assert.Contains("dashboardNavIcon", dashboardScript);
+        Assert.Contains("data-dashboard-logout", dashboardScript);
+        Assert.Contains("location.href = \"/login\"", dashboardScript);
         Assert.Contains("/api/v1/profile", dashboardScript);
         Assert.Contains("/api/v1/locations", dashboardScript);
         Assert.Contains("/api/v1/specialist/bookings", dashboardScript);
@@ -160,8 +232,43 @@ public sealed class Stage4BookingEndpointTests
         Assert.Contains(".calendar-grid", styles);
         Assert.Contains(".chart-grid", styles);
         Assert.Contains(".summary-card", styles);
+        Assert.Contains(".client-history-card", styles);
+        Assert.Contains(".client-notification-card", styles);
+        Assert.Contains(".client-profile-form", styles);
+        Assert.Contains(".app-nav-item", styles);
+        Assert.Contains(".specialist-body .dashboard-nav", styles);
+        Assert.Contains(".admin-body .dashboard-nav", styles);
+        Assert.Contains(".client-booking-panel #back-button", styles);
+        Assert.Contains("bottom: calc(64px + env(safe-area-inset-bottom))", styles);
+        Assert.Contains(".client-booking-panel .booking-header", styles);
+        Assert.Contains("display: none", styles);
+        Assert.Contains("position: fixed", styles);
+        Assert.Contains("grid-template-columns: repeat(4, minmax(0, 1fr))", styles);
+        Assert.Contains("grid-template-columns: repeat(7, minmax(0, 1fr))", styles);
+        Assert.Contains("Вход в систему", login);
+        Assert.DoesNotContain("data-login-role", login);
+        Assert.Contains("Запомнить меня", login);
+        Assert.Contains("href=\"/register.html\"", login);
+        Assert.Contains("/api/v1/auth/login", loginScript);
+        Assert.Contains("redirectByRole", loginScript);
+        Assert.Contains("Кабинет клиента", clientPortal);
+        Assert.Contains("id=\"client-sidebar\" hidden", clientPortal);
+        Assert.Contains("id=\"client-profile-form\"", clientPortal);
+        Assert.Contains("id=\"client-logout-button\"", clientPortal);
+        Assert.DoesNotContain("dashboard-topbar", clientPortal);
+        Assert.DoesNotContain("client-title", clientPortal);
+        Assert.DoesNotContain("client-refresh-button", clientPortal);
+        Assert.Contains("data-client-section=\"profile\"", clientPortal);
+        Assert.Contains("/api/v1/client/bookings", clientScript);
+        Assert.Contains("/api/v1/client/notifications", clientScript);
+        Assert.Contains("/api/v1/client/me", clientScript);
+        Assert.Contains("route: \"profile\"", clientScript);
+        Assert.Contains("startClientAutoRefresh", clientScript);
+        Assert.Contains("window.setInterval", clientScript);
         Assert.Contains("Регистрация специалиста", register);
+        Assert.Contains("Регистрация клиента", register);
         Assert.Contains("/api/v1/auth/register", registerScript);
+        Assert.Contains("/api/v1/auth/register/client", registerScript);
     }
 
     private static async Task<BookingSetup> CreatePublicBookingSetupAsync(HttpClient client)
@@ -202,7 +309,7 @@ public sealed class Stage4BookingEndpointTests
         specialistServiceResponse.EnsureSuccessStatusCode();
         client.DefaultRequestHeaders.Authorization = null;
 
-        return new BookingSetup(auth.SpecialistId, location.Id, service.Id);
+        return new BookingSetup(auth.SpecialistId, auth.AccessToken, location.Id, service.Id);
     }
 
     private static async Task<AuthResponse> RegisterAsync(HttpClient client)
@@ -219,5 +326,5 @@ public sealed class Stage4BookingEndpointTests
             ?? throw new InvalidOperationException("Auth response was empty.");
     }
 
-    private sealed record BookingSetup(Guid SpecialistId, Guid LocationId, Guid ServiceId);
+    private sealed record BookingSetup(Guid SpecialistId, string SpecialistAccessToken, Guid LocationId, Guid ServiceId);
 }

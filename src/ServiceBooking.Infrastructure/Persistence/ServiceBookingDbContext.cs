@@ -14,6 +14,12 @@ public sealed class ServiceBookingDbContext(DbContextOptions<ServiceBookingDbCon
     public DbSet<Booking> Bookings => Set<Booking>();
     public DbSet<BookingService> BookingServices => Set<BookingService>();
     public DbSet<Client> Clients => Set<Client>();
+    public DbSet<AdminUser> AdminUsers => Set<AdminUser>();
+    public DbSet<SubscriptionPlan> SubscriptionPlans => Set<SubscriptionPlan>();
+    public DbSet<SpecialistSubscription> SpecialistSubscriptions => Set<SpecialistSubscription>();
+    public DbSet<PaymentTransaction> PaymentTransactions => Set<PaymentTransaction>();
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<SystemSetting> SystemSettings => Set<SystemSetting>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -25,6 +31,12 @@ public sealed class ServiceBookingDbContext(DbContextOptions<ServiceBookingDbCon
         ConfigureBooking(modelBuilder);
         ConfigureBookingService(modelBuilder);
         ConfigureClient(modelBuilder);
+        ConfigureAdminUser(modelBuilder);
+        ConfigureSubscriptionPlan(modelBuilder);
+        ConfigureSpecialistSubscription(modelBuilder);
+        ConfigurePaymentTransaction(modelBuilder);
+        ConfigureAuditLog(modelBuilder);
+        ConfigureSystemSetting(modelBuilder);
     }
 
     private static void ConfigureSpecialist(ModelBuilder modelBuilder)
@@ -40,7 +52,9 @@ public sealed class ServiceBookingDbContext(DbContextOptions<ServiceBookingDbCon
             entity.Property(specialist => specialist.AvatarUrl).HasMaxLength(500);
             entity.Property(specialist => specialist.VenueName).HasMaxLength(160);
             entity.Property(specialist => specialist.CreatedAt).IsRequired();
+            entity.Property(specialist => specialist.BlockReason).HasMaxLength(500);
             entity.HasIndex(specialist => specialist.Email).IsUnique();
+            entity.HasIndex(specialist => specialist.IsBlocked);
 
             entity
                 .HasOne(specialist => specialist.Location)
@@ -177,11 +191,132 @@ public sealed class ServiceBookingDbContext(DbContextOptions<ServiceBookingDbCon
             entity.HasKey(client => client.Id);
             entity.Property(client => client.FullName).HasMaxLength(100).IsRequired();
             entity.Property(client => client.Phone).HasMaxLength(32).IsRequired();
+            entity.Property(client => client.Email).HasMaxLength(254);
+            entity.Property(client => client.PasswordHash).HasMaxLength(500);
+            entity.Property(client => client.RefreshTokenHash).HasMaxLength(500);
             entity.Property(client => client.Status).HasConversion<string>().HasMaxLength(24).IsRequired();
             entity.Property(client => client.Tag).HasMaxLength(200);
             entity.Property(client => client.CreatedAt).IsRequired();
+            entity.HasIndex(client => client.Email).IsUnique().HasFilter("Email IS NOT NULL");
             entity.HasIndex(client => client.Phone).IsUnique();
             entity.Navigation(client => client.Bookings).UsePropertyAccessMode(PropertyAccessMode.Field);
+        });
+    }
+
+    private static void ConfigureAdminUser(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<AdminUser>(entity =>
+        {
+            entity.HasKey(admin => admin.Id);
+            entity.Property(admin => admin.FullName).HasMaxLength(100).IsRequired();
+            entity.Property(admin => admin.Email).HasMaxLength(254).IsRequired();
+            entity.Property(admin => admin.PasswordHash).HasMaxLength(500).IsRequired();
+            entity.Property(admin => admin.CreatedAt).IsRequired();
+            entity.HasIndex(admin => admin.Email).IsUnique();
+            entity.HasIndex(admin => admin.IsActive);
+        });
+    }
+
+    private static void ConfigureSubscriptionPlan(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<SubscriptionPlan>(entity =>
+        {
+            entity.HasKey(plan => plan.Id);
+            entity.Property(plan => plan.Name).HasMaxLength(120).IsRequired();
+            entity.Property(plan => plan.Description).HasMaxLength(500);
+            entity.Property(plan => plan.MonthlyPrice).HasPrecision(18, 2).IsRequired();
+            entity.Property(plan => plan.BookingLimit).IsRequired();
+            entity.Property(plan => plan.ServiceLimit).IsRequired();
+            entity.Property(plan => plan.CreatedAt).IsRequired();
+            entity.HasIndex(plan => plan.Name).IsUnique();
+            entity.HasIndex(plan => plan.IsActive);
+            entity.Navigation(plan => plan.Subscriptions).UsePropertyAccessMode(PropertyAccessMode.Field);
+        });
+    }
+
+    private static void ConfigureSpecialistSubscription(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<SpecialistSubscription>(entity =>
+        {
+            entity.HasKey(subscription => subscription.Id);
+            entity.Property(subscription => subscription.Status).HasConversion<string>().HasMaxLength(24).IsRequired();
+            entity.Property(subscription => subscription.StartedAt).IsRequired();
+            entity.Property(subscription => subscription.ExpiresAt).IsRequired();
+            entity.HasIndex(subscription => new { subscription.SpecialistId, subscription.Status });
+            entity.HasIndex(subscription => subscription.ExpiresAt);
+
+            entity
+                .HasOne(subscription => subscription.Specialist)
+                .WithMany()
+                .HasForeignKey(subscription => subscription.SpecialistId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity
+                .HasOne(subscription => subscription.Plan)
+                .WithMany(plan => (IEnumerable<SpecialistSubscription>)plan.Subscriptions)
+                .HasForeignKey(subscription => subscription.PlanId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+    }
+
+    private static void ConfigurePaymentTransaction(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<PaymentTransaction>(entity =>
+        {
+            entity.HasKey(payment => payment.Id);
+            entity.Property(payment => payment.Amount).HasPrecision(18, 2).IsRequired();
+            entity.Property(payment => payment.Currency).HasMaxLength(8).IsRequired();
+            entity.Property(payment => payment.Provider).HasMaxLength(80).IsRequired();
+            entity.Property(payment => payment.Status).HasConversion<string>().HasMaxLength(24).IsRequired();
+            entity.Property(payment => payment.ExternalId).HasMaxLength(160);
+            entity.Property(payment => payment.FailureReason).HasMaxLength(500);
+            entity.Property(payment => payment.CreatedAt).IsRequired();
+            entity.HasIndex(payment => new { payment.SpecialistId, payment.Status });
+            entity.HasIndex(payment => payment.CreatedAt);
+
+            entity
+                .HasOne(payment => payment.Specialist)
+                .WithMany()
+                .HasForeignKey(payment => payment.SpecialistId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity
+                .HasOne(payment => payment.Subscription)
+                .WithMany()
+                .HasForeignKey(payment => payment.SubscriptionId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+    }
+
+    private static void ConfigureAuditLog(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<AuditLog>(entity =>
+        {
+            entity.HasKey(log => log.Id);
+            entity.Property(log => log.ActorType).HasMaxLength(40).IsRequired();
+            entity.Property(log => log.Action).HasMaxLength(120).IsRequired();
+            entity.Property(log => log.EntityType).HasMaxLength(120).IsRequired();
+            entity.Property(log => log.EntityId).HasMaxLength(120);
+            entity.Property(log => log.Outcome).HasMaxLength(40).IsRequired();
+            entity.Property(log => log.Details).HasMaxLength(2000);
+            entity.Property(log => log.IpAddress).HasMaxLength(80);
+            entity.Property(log => log.CreatedAt).IsRequired();
+            entity.HasIndex(log => log.CreatedAt);
+            entity.HasIndex(log => new { log.ActorId, log.ActorType });
+            entity.HasIndex(log => new { log.Action, log.EntityType });
+        });
+    }
+
+    private static void ConfigureSystemSetting(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<SystemSetting>(entity =>
+        {
+            entity.HasKey(setting => setting.Id);
+            entity.Property(setting => setting.Key).HasMaxLength(120).IsRequired();
+            entity.Property(setting => setting.Value).HasMaxLength(2000).IsRequired();
+            entity.Property(setting => setting.Description).HasMaxLength(500);
+            entity.Property(setting => setting.UpdatedAt).IsRequired();
+            entity.HasIndex(setting => setting.Key).IsUnique();
         });
     }
 }

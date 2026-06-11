@@ -14,6 +14,12 @@ internal static class ControllerResultExtensions
         return Guid.TryParse(id, out var specialistId) ? specialistId : null;
     }
 
+    public static Guid? GetCurrentUserId(this ClaimsPrincipal user)
+    {
+        var id = user.FindFirstValue(ClaimTypes.NameIdentifier);
+        return Guid.TryParse(id, out var userId) ? userId : null;
+    }
+
     public static ActionResult<T> ToErrorResult<T>(this ControllerBase controller, ServiceResult<T> result)
     {
         var error = result.Error ?? new ServiceError("request_failed", "Request failed.");

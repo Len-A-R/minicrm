@@ -7,10 +7,14 @@ namespace ServiceBooking.Application.Auth;
 
 public sealed class AuthService(
     ISpecialistRepository specialists,
+    IClientAuthRepository clients,
+    IAdminAuthLookupRepository admins,
     IPasswordHasher passwordHasher,
     ITokenService tokenService,
     IDateTimeProvider dateTimeProvider) : IAuthService
 {
+    private const string DefaultAdminEmail = "admin@minicrm";
+
     public async Task<ServiceResult<AuthResponse>> RegisterAsync(
         RegisterSpecialistRequest request,
         CancellationToken cancellationToken)
@@ -22,12 +26,12 @@ public sealed class AuthService(
         }
 
         var normalizedEmail = NormalizeEmail(request.Email);
-        if (await specialists.EmailExistsAsync(normalizedEmail, cancellationToken))
+        if (await EmailExistsAsync(normalizedEmail, cancellationToken))
         {
             return ServiceResult<AuthResponse>.Failure(
                 ResultStatus.Conflict,
                 "email_conflict",
-                "A specialist with this email already exists.");
+                "An account with this email already exists.");
         }
 
         var specialist = new Specialist(
@@ -40,6 +44,51 @@ public sealed class AuthService(
         return await IssueTokensAsync(specialist, cancellationToken);
     }
 
+    public async Task<ServiceResult<AuthResponse>> RegisterClientAsync(
+        RegisterClientRequest request,
+        CancellationToken cancellationToken)
+    {
+        var validationError = ValidateRegistration(request);
+        if (validationError is not null)
+        {
+            return ServiceResult<AuthResponse>.Failure(ResultStatus.Validation, validationError.Code, validationError.Message);
+        }
+
+        var normalizedEmail = NormalizeEmail(request.Email);
+        if (normalizedEmail == DefaultAdminEmail
+            || await specialists.EmailExistsAsync(normalizedEmail, cancellationToken)
+            || await clients.EmailExistsAsync(normalizedEmail, cancellationToken))
+        {
+            return ServiceResult<AuthResponse>.Failure(
+                ResultStatus.Conflict,
+                "email_conflict",
+                "An account with this email already exists.");
+        }
+
+        var phone = request.Phone.Trim();
+        var existingClient = await clients.GetByPhoneAsync(phone, cancellationToken);
+        if (existingClient is not null && !string.IsNullOrWhiteSpace(existingClient.Email))
+        {
+            return ServiceResult<AuthResponse>.Failure(
+                ResultStatus.Conflict,
+                "phone_conflict",
+                "A client with this phone already exists.");
+        }
+
+        var passwordHash = passwordHasher.Hash(request.Password);
+        var client = existingClient ?? new Client(request.FullName, phone);
+        client.Rename(request.FullName);
+        client.ChangePhone(phone);
+        client.SetCredentials(normalizedEmail, passwordHash);
+
+        if (existingClient is null)
+        {
+            await clients.AddAsync(client, cancellationToken);
+        }
+
+        return await IssueTokensAsync(client, cancellationToken);
+    }
+
     public async Task<ServiceResult<AuthResponse>> LoginAsync(LoginRequest request, CancellationToken cancellationToken)
     {
         if (!IsValidEmail(request.Email) || string.IsNullOrWhiteSpace(request.Password))
@@ -47,10 +96,38 @@ public sealed class AuthService(
             return InvalidCredentials();
         }
 
-        var specialist = await specialists.GetByEmailAsync(NormalizeEmail(request.Email), cancellationToken);
+        var normalizedEmail = NormalizeEmail(request.Email);
+        if (normalizedEmail == DefaultAdminEmail)
+        {
+            var admin = await admins.GetAdminByEmailAsync(normalizedEmail, cancellationToken);
+            if (admin is not null && admin.IsActive && passwordHasher.Verify(request.Password, admin.PasswordHash))
+            {
+                return await IssueTokensAsync(admin, cancellationToken);
+            }
+
+            return InvalidCredentials();
+        }
+
+        var specialist = await specialists.GetByEmailAsync(normalizedEmail, cancellationToken);
         if (specialist is null || !passwordHasher.Verify(request.Password, specialist.PasswordHash))
         {
-            return InvalidCredentials();
+            var client = await clients.GetByEmailAsync(normalizedEmail, cancellationToken);
+            if (client is null
+                || string.IsNullOrWhiteSpace(client.PasswordHash)
+                || !passwordHasher.Verify(request.Password, client.PasswordHash))
+            {
+                return InvalidCredentials();
+            }
+
+            return await IssueTokensAsync(client, cancellationToken);
+        }
+
+        if (specialist.IsBlocked)
+        {
+            return ServiceResult<AuthResponse>.Failure(
+                ResultStatus.Unauthorized,
+                "specialist_blocked",
+                "Specialist account is blocked.");
         }
 
         return await IssueTokensAsync(specialist, cancellationToken);
@@ -124,7 +201,59 @@ public sealed class AuthService(
             accessToken.Token,
             accessToken.ExpiresAt,
             refreshToken.Token,
-            refreshToken.ExpiresAt));
+            refreshToken.ExpiresAt)
+        {
+            Role = "Specialist"
+        });
+    }
+
+    private async Task<ServiceResult<AuthResponse>> IssueTokensAsync(
+        Client client,
+        CancellationToken cancellationToken)
+    {
+        var utcNow = dateTimeProvider.UtcNow;
+        var accessToken = tokenService.CreateClientAccessToken(client, utcNow);
+        var refreshToken = tokenService.CreateRefreshToken(utcNow);
+
+        client.SetRefreshToken(passwordHasher.Hash(refreshToken.Token), refreshToken.ExpiresAt);
+        await clients.SaveChangesAsync(cancellationToken);
+
+        return ServiceResult<AuthResponse>.Success(new AuthResponse(
+            Guid.Empty,
+            client.FullName,
+            client.Email ?? string.Empty,
+            accessToken.Token,
+            accessToken.ExpiresAt,
+            refreshToken.Token,
+            refreshToken.ExpiresAt)
+        {
+            Role = "Client",
+            ClientId = client.Id
+        });
+    }
+
+    private async Task<ServiceResult<AuthResponse>> IssueTokensAsync(
+        AdminUser admin,
+        CancellationToken cancellationToken)
+    {
+        var utcNow = dateTimeProvider.UtcNow;
+        var accessToken = tokenService.CreateAdminAccessToken(admin, utcNow);
+
+        admin.RecordLogin(utcNow);
+        await admins.SaveChangesAsync(cancellationToken);
+
+        return ServiceResult<AuthResponse>.Success(new AuthResponse(
+            Guid.Empty,
+            admin.FullName,
+            admin.Email,
+            accessToken.Token,
+            accessToken.ExpiresAt,
+            string.Empty,
+            accessToken.ExpiresAt)
+        {
+            Role = "Admin",
+            AdminId = admin.Id
+        });
     }
 
     private static ServiceResult<AuthResponse> InvalidCredentials()
@@ -137,27 +266,52 @@ public sealed class AuthService(
 
     private static ServiceError? ValidateRegistration(RegisterSpecialistRequest request)
     {
-        if (string.IsNullOrWhiteSpace(request.FullName) || request.FullName.Trim().Length < 2)
+        return ValidateRegistration(
+            request.FullName,
+            request.Email,
+            request.Phone,
+            request.Password,
+            request.ConfirmPassword);
+    }
+
+    private static ServiceError? ValidateRegistration(RegisterClientRequest request)
+    {
+        return ValidateRegistration(
+            request.FullName,
+            request.Email,
+            request.Phone,
+            request.Password,
+            request.ConfirmPassword);
+    }
+
+    private static ServiceError? ValidateRegistration(
+        string fullName,
+        string email,
+        string phone,
+        string password,
+        string confirmPassword)
+    {
+        if (string.IsNullOrWhiteSpace(fullName) || fullName.Trim().Length < 2)
         {
             return new ServiceError("invalid_full_name", "Full name must contain at least 2 characters.");
         }
 
-        if (!IsValidEmail(request.Email))
+        if (!IsValidEmail(email))
         {
             return new ServiceError("invalid_email", "Email format is invalid.");
         }
 
-        if (string.IsNullOrWhiteSpace(request.Phone))
+        if (string.IsNullOrWhiteSpace(phone))
         {
             return new ServiceError("invalid_phone", "Phone is required.");
         }
 
-        if (request.Password != request.ConfirmPassword)
+        if (password != confirmPassword)
         {
             return new ServiceError("password_mismatch", "Password confirmation does not match.");
         }
 
-        if (!IsStrongPassword(request.Password))
+        if (!IsStrongPassword(password))
         {
             return new ServiceError(
                 "weak_password",
@@ -194,4 +348,12 @@ public sealed class AuthService(
     }
 
     private static string NormalizeEmail(string email) => email.Trim().ToLowerInvariant();
+
+    private async Task<bool> EmailExistsAsync(string normalizedEmail, CancellationToken cancellationToken)
+    {
+        return normalizedEmail == DefaultAdminEmail
+            || await admins.AdminEmailExistsAsync(normalizedEmail, cancellationToken)
+            || await specialists.EmailExistsAsync(normalizedEmail, cancellationToken)
+            || await clients.EmailExistsAsync(normalizedEmail, cancellationToken);
+    }
 }

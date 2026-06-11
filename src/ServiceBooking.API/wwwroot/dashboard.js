@@ -38,18 +38,25 @@ const dashboardState = {
   reportsGrouping: "day",
   reportCharts: [],
   reportData: null,
-  token: localStorage.getItem("serviceBookingAccessToken") || ""
+  role: getStoredAuthValue("serviceBookingUserRole") || "",
+  token: getStoredAuthValue("serviceBookingAccessToken") || "",
+  refreshTimerId: 0
 };
 
+const specialistMenuItems = [
+  { route: "profile", label: "Профиль", icon: "user" },
+  { route: "bookings", label: "Заявки", icon: "inbox" },
+  { route: "clients", label: "Клиенты", icon: "users" },
+  { route: "services", label: "Услуги", icon: "briefcase" },
+  { route: "calendar", label: "Календарь", icon: "calendar" },
+  { route: "kanban", label: "Kanban", icon: "columns" },
+  { route: "reports", label: "Бухгалтерия", icon: "chart" }
+];
+
 const dashboardEls = {
-  nav: [...document.querySelectorAll(".dashboard-nav-item")],
+  sidebar: document.querySelector("#dashboard-sidebar"),
+  nav: document.querySelector("#dashboard-nav"),
   content: document.querySelector("#dashboard-content"),
-  title: document.querySelector("#dashboard-title"),
-  label: document.querySelector("#dashboard-section-label"),
-  refresh: document.querySelector("#refresh-button"),
-  loginPanel: document.querySelector("#login-panel"),
-  loginForm: document.querySelector("#login-form"),
-  logout: document.querySelector("#logout-button"),
   toast: document.querySelector("#dashboard-toast"),
   dialog: document.querySelector("#action-dialog"),
   dialogTitle: document.querySelector("#dialog-title"),
@@ -63,12 +70,6 @@ const dashboardEls = {
 document.addEventListener("DOMContentLoaded", initDashboard);
 
 function initDashboard() {
-  dashboardEls.nav.forEach((button) => {
-    button.addEventListener("click", () => navigate(button.dataset.route));
-  });
-  dashboardEls.refresh.addEventListener("click", () => loadRoute(true));
-  dashboardEls.logout.addEventListener("click", logout);
-  dashboardEls.loginForm.addEventListener("submit", login);
   dashboardEls.dialogClose.addEventListener("click", closeDialog);
   dashboardEls.dialogCancel.addEventListener("click", closeDialog);
   window.addEventListener("popstate", () => {
@@ -77,12 +78,19 @@ function initDashboard() {
   });
 
   dashboardState.route = getRouteFromLocation();
+  if (!dashboardState.token || dashboardState.role !== "Specialist") {
+    redirectToLogin();
+    return;
+  }
+
+  buildDashboardMenu();
   loadRoute(false);
+  startDashboardAutoRefresh();
 }
 
 function getRouteFromLocation() {
   const route = new URLSearchParams(location.search).get("section");
-  return ["profile", "bookings", "clients", "services", "calendar", "kanban", "reports"].includes(route) ? route : "bookings";
+  return specialistMenuItems.some((item) => item.route === route) ? route : "bookings";
 }
 
 function navigate(route) {
@@ -91,43 +99,35 @@ function navigate(route) {
   loadRoute(false);
 }
 
-async function login(event) {
-  event.preventDefault();
-  const payload = {
-    email: document.querySelector("#login-email").value.trim(),
-    password: document.querySelector("#login-password").value
-  };
-
-  try {
-    const auth = await requestJson(dashboardApi.login, { method: "POST", body: payload, auth: false });
-    dashboardState.token = auth.accessToken;
-    localStorage.setItem("serviceBookingAccessToken", auth.accessToken);
-    localStorage.setItem("serviceBookingRefreshToken", auth.refreshToken);
-    dashboardEls.loginPanel.hidden = true;
-    dashboardState.cache.clear();
-    await loadRoute(true);
-  } catch (error) {
-    showDashboardToast(error.message, true);
-  }
-}
-
 function logout() {
   dashboardState.token = "";
   dashboardState.cache.clear();
   localStorage.removeItem("serviceBookingAccessToken");
   localStorage.removeItem("serviceBookingRefreshToken");
-  loadRoute(true);
+  localStorage.removeItem("serviceBookingAdminAccessToken");
+  localStorage.removeItem("serviceBookingUserRole");
+  sessionStorage.removeItem("serviceBookingAccessToken");
+  sessionStorage.removeItem("serviceBookingRefreshToken");
+  sessionStorage.removeItem("serviceBookingAdminAccessToken");
+  sessionStorage.removeItem("serviceBookingUserRole");
+  redirectToLogin();
+}
+
+function redirectToLogin() {
+  location.href = "/login";
+}
+
+function getStoredAuthValue(key) {
+  return localStorage.getItem(key) || sessionStorage.getItem(key);
 }
 
 async function loadRoute(force) {
   updateChrome();
   if (!dashboardState.token) {
-    dashboardEls.loginPanel.hidden = false;
-    dashboardEls.content.innerHTML = "";
+    redirectToLogin();
     return;
   }
 
-  dashboardEls.loginPanel.hidden = true;
   if (dashboardState.route !== "reports") {
     destroyReportCharts();
   }
@@ -161,20 +161,36 @@ async function loadRoute(force) {
   }, 180);
 }
 
+function startDashboardAutoRefresh() {
+  window.clearInterval(dashboardState.refreshTimerId);
+  dashboardState.refreshTimerId = window.setInterval(() => {
+    if (dashboardState.route === "profile") {
+      return;
+    }
+    loadRoute(true);
+  }, 30000);
+}
+
+function buildDashboardMenu() {
+  dashboardEls.nav.innerHTML = specialistMenuItems
+    .map((item) => `
+      <button type="button" class="dashboard-nav-item app-nav-item" data-route="${item.route}" aria-label="${escapeDashboardHtml(item.label)}">
+        ${dashboardNavIcon(item.icon)}
+        <span>${escapeDashboardHtml(item.label)}</span>
+      </button>`)
+    .join("");
+  dashboardEls.nav.querySelectorAll("[data-route]").forEach((button) => {
+    button.addEventListener("click", () => navigate(button.dataset.route));
+  });
+  dashboardEls.sidebar.hidden = false;
+  document.body.classList.remove("no-sidebar");
+  updateChrome();
+}
+
 function updateChrome() {
-  const titles = {
-    profile: ["Профиль", "Профиль специалиста"],
-    bookings: ["Заявки", "Управление заявками"],
-    clients: ["Клиенты", "Клиентская база"],
-    services: ["Услуги", "Предоставляемые услуги"],
-    calendar: ["Календарь", "Расписание"],
-    kanban: ["Kanban", "Доска заявок"],
-    reports: ["Бухгалтерия", "Финансовая аналитика"]
-  };
-  const [label, title] = titles[dashboardState.route] || titles.bookings;
-  dashboardEls.title.textContent = title;
-  dashboardEls.label.textContent = label;
-  dashboardEls.nav.forEach((button) => button.classList.toggle("active", button.dataset.route === dashboardState.route));
+  dashboardEls.nav.querySelectorAll("[data-route]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.route === dashboardState.route);
+  });
 }
 
 async function renderProfile(force) {
@@ -233,13 +249,17 @@ async function renderProfile(force) {
         <input id="profile-new-location-description" type="text" maxlength="500">
       </div>
 
-      <button class="primary-button" type="submit">Сохранить профиль</button>
+      <div class="profile-actions">
+        <button class="primary-button" type="submit">Сохранить профиль</button>
+        <button class="secondary-button" type="button" data-dashboard-logout>Выйти</button>
+      </div>
     </form>`;
 
   dashboardEls.content.querySelector("#profile-phone").addEventListener("input", (event) => {
     event.target.value = event.target.value.replace(/[^\d+ ().-]/g, "");
   });
   dashboardEls.content.querySelector("#profile-form").addEventListener("submit", submitProfile);
+  dashboardEls.content.querySelector("[data-dashboard-logout]").addEventListener("click", logout);
 }
 
 async function submitProfile(event) {
@@ -1329,4 +1349,17 @@ function escapeDashboardHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+function dashboardNavIcon(name) {
+  const icons = {
+    user: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 21a8 8 0 0 0-16 0M12 13a5 5 0 1 0 0-10 5 5 0 0 0 0 10Z"/></svg>`,
+    inbox: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12h-6l-2 3h-4l-2-3H2M5 4h14l3 8v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-6Z"/></svg>`,
+    users: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
+    briefcase: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6V5a2 2 0 0 1 2-2h0a2 2 0 0 1 2 2v1M3 7h18v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2ZM3 13h18"/></svg>`,
+    calendar: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v3M17 3v3M4 9h16M6 5h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z"/></svg>`,
+    columns: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16M8 5v14M16 5v14M5 19h14"/></svg>`,
+    chart: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v18h18M8 17V9M13 17V5M18 17v-6"/></svg>`
+  };
+  return icons[name] || "";
 }

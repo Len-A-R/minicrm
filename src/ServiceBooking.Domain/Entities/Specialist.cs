@@ -36,6 +36,9 @@ public sealed class Specialist
     public Guid? LocationId { get; private set; }
     public Location? Location { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
+    public bool IsBlocked { get; private set; }
+    public DateTimeOffset? BlockedAt { get; private set; }
+    public string? BlockReason { get; private set; }
     public IReadOnlyCollection<SpecialistService> Services => _services;
     public IReadOnlyCollection<Vacation> Vacations => _vacations;
     public IReadOnlyCollection<Booking> Bookings => _bookings;
@@ -80,6 +83,25 @@ public sealed class Specialist
         }
 
         AvatarUrl = string.IsNullOrWhiteSpace(avatarUrl) ? null : avatarUrl.Trim();
+    }
+
+    public void Block(string? reason, DateTimeOffset utcNow)
+    {
+        if (reason is { Length: > 500 })
+        {
+            throw new ArgumentException("Block reason cannot exceed 500 characters.", nameof(reason));
+        }
+
+        IsBlocked = true;
+        BlockedAt = utcNow;
+        BlockReason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
+    }
+
+    public void Unblock()
+    {
+        IsBlocked = false;
+        BlockedAt = null;
+        BlockReason = null;
     }
 
     private static string ValidateRequired(string value, string parameterName, int maxLength, int minLength)

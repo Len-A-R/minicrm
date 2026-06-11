@@ -3,18 +3,23 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ServiceBooking · Регистрация специалиста</title>
+  <title>ServiceBooking · Регистрация</title>
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body class="auth-body">
   <main class="auth-shell">
-    <section class="auth-panel" aria-label="Регистрация специалиста">
+    <section class="auth-panel" aria-label="Регистрация">
       <header class="auth-header">
         <p class="eyebrow">ServiceBooking</p>
-        <h1>Регистрация специалиста</h1>
+        <h1>Регистрация</h1>
       </header>
 
       <form id="register-form" class="auth-form" novalidate>
+        <div class="segmented-control login-role-control" aria-label="Тип регистрации">
+          <button type="button" class="segment-button active" data-register-role="client">Регистрация клиента</button>
+          <button type="button" class="segment-button" data-register-role="specialist">Регистрация специалиста</button>
+        </div>
+
         <div class="field-group">
           <label for="register-full-name">ФИО</label>
           <input id="register-full-name" name="fullName" type="text" autocomplete="name" required>
@@ -51,7 +56,7 @@
       </form>
 
       <footer class="auth-footer">
-        <a href="/dashboard.html">Войти в кабинет</a>
+        <a href="/login">Войти в кабинет</a>
       </footer>
 
       <div class="result-banner auth-result" id="register-result" role="status" aria-live="polite"></div>

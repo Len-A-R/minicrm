@@ -17,6 +17,101 @@ namespace ServiceBooking.Infrastructure.Persistence.Migrations
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "8.0.11");
 
+            modelBuilder.Entity("ServiceBooking.Domain.Entities.AdminUser", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(254)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("FullName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTimeOffset?>("LastLoginAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PasswordHash")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Email")
+                        .IsUnique();
+
+                    b.HasIndex("IsActive");
+
+                    b.ToTable("AdminUsers");
+                });
+
+            modelBuilder.Entity("ServiceBooking.Domain.Entities.AuditLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("ActorId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ActorType")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Details")
+                        .HasMaxLength(2000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("EntityId")
+                        .HasMaxLength(120)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("IpAddress")
+                        .HasMaxLength(80)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("Action", "EntityType");
+
+                    b.HasIndex("ActorId", "ActorType");
+
+                    b.ToTable("AuditLogs");
+                });
+
             modelBuilder.Entity("ServiceBooking.Domain.Entities.Booking", b =>
                 {
                     b.Property<Guid>("Id")
@@ -142,14 +237,29 @@ namespace ServiceBooking.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("Email")
+                        .HasMaxLength(254)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("FullName")
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("PasswordHash")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Phone")
                         .IsRequired()
                         .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset?>("RefreshTokenExpiresAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("RefreshTokenHash")
+                        .HasMaxLength(500)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Status")
@@ -162,6 +272,10 @@ namespace ServiceBooking.Infrastructure.Persistence.Migrations
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("Email")
+                        .IsUnique()
+                        .HasFilter("Email IS NOT NULL");
 
                     b.HasIndex("Phone")
                         .IsUnique();
@@ -194,6 +308,62 @@ namespace ServiceBooking.Infrastructure.Persistence.Migrations
                     b.ToTable("Locations");
                 });
 
+            modelBuilder.Entity("ServiceBooking.Domain.Entities.PaymentTransaction", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ExternalId")
+                        .HasMaxLength(160)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("FailureReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset?>("PaidAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("SpecialistId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("SubscriptionId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("SubscriptionId");
+
+                    b.HasIndex("SpecialistId", "Status");
+
+                    b.ToTable("PaymentTransactions");
+                });
+
             modelBuilder.Entity("ServiceBooking.Domain.Entities.Service", b =>
                 {
                     b.Property<Guid>("Id")
@@ -224,6 +394,13 @@ namespace ServiceBooking.Infrastructure.Persistence.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("BlockReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset?>("BlockedAt")
+                        .HasColumnType("TEXT");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("TEXT");
 
@@ -236,6 +413,9 @@ namespace ServiceBooking.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsBlocked")
+                        .HasColumnType("INTEGER");
 
                     b.Property<Guid?>("LocationId")
                         .HasColumnType("TEXT");
@@ -265,6 +445,8 @@ namespace ServiceBooking.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("Email")
                         .IsUnique();
+
+                    b.HasIndex("IsBlocked");
 
                     b.HasIndex("LocationId");
 
@@ -298,6 +480,115 @@ namespace ServiceBooking.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("SpecialistServices");
+                });
+
+            modelBuilder.Entity("ServiceBooking.Domain.Entities.SpecialistSubscription", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("PlanId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset?>("RenewedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("SpecialistId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset>("StartedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExpiresAt");
+
+                    b.HasIndex("PlanId");
+
+                    b.HasIndex("SpecialistId", "Status");
+
+                    b.ToTable("SpecialistSubscriptions");
+                });
+
+            modelBuilder.Entity("ServiceBooking.Domain.Entities.SubscriptionPlan", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("BookingLimit")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal>("MonthlyPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ServiceLimit")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IsActive");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("SubscriptionPlans");
+                });
+
+            modelBuilder.Entity("ServiceBooking.Domain.Entities.SystemSetting", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Key")
+                        .IsUnique();
+
+                    b.ToTable("SystemSettings");
                 });
 
             modelBuilder.Entity("ServiceBooking.Domain.Entities.Vacation", b =>
@@ -353,6 +644,24 @@ namespace ServiceBooking.Infrastructure.Persistence.Migrations
                     b.Navigation("Booking");
                 });
 
+            modelBuilder.Entity("ServiceBooking.Domain.Entities.PaymentTransaction", b =>
+                {
+                    b.HasOne("ServiceBooking.Domain.Entities.Specialist", "Specialist")
+                        .WithMany()
+                        .HasForeignKey("SpecialistId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ServiceBooking.Domain.Entities.SpecialistSubscription", "Subscription")
+                        .WithMany()
+                        .HasForeignKey("SubscriptionId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Specialist");
+
+                    b.Navigation("Subscription");
+                });
+
             modelBuilder.Entity("ServiceBooking.Domain.Entities.Specialist", b =>
                 {
                     b.HasOne("ServiceBooking.Domain.Entities.Location", "Location")
@@ -378,6 +687,25 @@ namespace ServiceBooking.Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("Service");
+
+                    b.Navigation("Specialist");
+                });
+
+            modelBuilder.Entity("ServiceBooking.Domain.Entities.SpecialistSubscription", b =>
+                {
+                    b.HasOne("ServiceBooking.Domain.Entities.SubscriptionPlan", "Plan")
+                        .WithMany("Subscriptions")
+                        .HasForeignKey("PlanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ServiceBooking.Domain.Entities.Specialist", "Specialist")
+                        .WithMany()
+                        .HasForeignKey("SpecialistId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Plan");
 
                     b.Navigation("Specialist");
                 });
@@ -420,6 +748,11 @@ namespace ServiceBooking.Infrastructure.Persistence.Migrations
                     b.Navigation("Services");
 
                     b.Navigation("Vacations");
+                });
+
+            modelBuilder.Entity("ServiceBooking.Domain.Entities.SubscriptionPlan", b =>
+                {
+                    b.Navigation("Subscriptions");
                 });
 #pragma warning restore 612, 618
         }

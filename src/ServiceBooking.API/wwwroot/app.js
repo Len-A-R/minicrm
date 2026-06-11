@@ -6,7 +6,9 @@ const api = {
   specialistServices: (specialistId) => `/api/v1/specialists/${encodeURIComponent(specialistId)}/services`,
   slots: (specialistId, date, duration) =>
     `/api/v1/specialists/${encodeURIComponent(specialistId)}/slots?date=${encodeURIComponent(date)}&durationMinutes=${duration}`,
-  bookings: "/api/v1/bookings"
+  bookings: "/api/v1/bookings",
+  clientMe: "/api/v1/client/me",
+  clientBookings: "/api/v1/client/bookings"
 };
 
 const state = {
@@ -21,6 +23,8 @@ const state = {
   selectedSpecialistId: "",
   selectedServiceIds: new Set(),
   selectedTime: "",
+  clientProfile: null,
+  clientToken: getBookingAuthRole() === "Client" ? getBookingAuthValue("serviceBookingAccessToken") : "",
   loading: false
 };
 
@@ -59,6 +63,7 @@ async function init() {
 
   bindEvents();
   setStep(0);
+  await hydrateAuthenticatedClient();
   await loadServices();
   validateForm();
 }
@@ -87,6 +92,39 @@ function bindEvents() {
   els.backButton.addEventListener("click", () => setStep(Math.max(0, state.step - 1)));
   els.nextButton.addEventListener("click", () => setStep(Math.min(6, state.step + 1)));
   els.form.addEventListener("submit", submitBooking);
+}
+
+async function hydrateAuthenticatedClient() {
+  if (!state.clientToken) {
+    return;
+  }
+
+  try {
+    state.clientProfile = await getJson(api.clientMe, { auth: true });
+    applyClientProfile();
+  } catch {
+    clearBookingAuth();
+    if (location.pathname.endsWith("/client.html")) {
+      location.href = "/login";
+    }
+  }
+}
+
+function applyClientProfile() {
+  if (!state.clientProfile) {
+    return;
+  }
+
+  els.clientName.value = state.clientProfile.fullName;
+  els.clientPhone.value = state.clientProfile.phone;
+  els.clientName.disabled = true;
+  els.clientPhone.disabled = true;
+}
+
+function setClientProfile(profile) {
+  state.clientProfile = profile;
+  applyClientProfile();
+  validateForm();
 }
 
 async function loadServices() {
@@ -351,7 +389,7 @@ async function submitBooking(event) {
     return;
   }
 
-  const payload = {
+  const publicPayload = {
     clientName: els.clientName.value.trim(),
     clientPhone: els.clientPhone.value.trim(),
     specialistId: state.selectedSpecialistId,
@@ -360,16 +398,26 @@ async function submitBooking(event) {
     requestedTime: normalizeBookingTime(state.selectedTime),
     message: els.message.value.trim() || null
   };
+  const clientPayload = {
+    specialistId: state.selectedSpecialistId,
+    serviceIds: [...state.selectedServiceIds],
+    requestedDate: els.requestedDate.value,
+    requestedTime: normalizeBookingTime(state.selectedTime),
+    message: els.message.value.trim() || null
+  };
+  const isClientBooking = Boolean(state.clientToken && state.clientProfile);
 
   state.loading = true;
   els.submitButton.textContent = "Отправка...";
   showResult("", false);
 
   try {
-    const response = await fetch(api.bookings, {
+    const response = await fetch(isClientBooking ? api.clientBookings : api.bookings, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
+      headers: isClientBooking
+        ? { "Content-Type": "application/json", Authorization: `Bearer ${state.clientToken}` }
+        : { "Content-Type": "application/json" },
+      body: JSON.stringify(isClientBooking ? clientPayload : publicPayload)
     });
     const data = await response.json().catch(() => null);
 
@@ -379,6 +427,7 @@ async function submitBooking(event) {
 
     showResult(`Заявка создана. Номер: ${data.id}`, false);
     els.form.reset();
+    applyClientProfile();
     state.selectedServiceIds.clear();
     state.selectedServiceCategoryId = "";
     state.selectedLocationId = "";
@@ -450,8 +499,64 @@ function setStep(step) {
   validateForm();
 }
 
-async function getJson(url) {
-  const response = await fetch(url);
+async function repeatBooking(booking) {
+  const serviceIds = (booking.services || []).map((service) => service.serviceId).filter(Boolean);
+  const firstServiceId = serviceIds[0];
+  if (!firstServiceId) {
+    showResult("В записи нет услуги для повторного бронирования.", true);
+    return;
+  }
+
+  state.selectedServiceCategoryId = firstServiceId;
+  state.selectedLocationId = "";
+  state.selectedSpecialistId = "";
+  state.selectedServiceIds.clear();
+  state.specialists = [];
+  state.specialistServices = [];
+  state.slots = [];
+  renderServices();
+  await loadLocations();
+
+  if (booking.specialistLocationId) {
+    state.selectedLocationId = booking.specialistLocationId;
+    renderLocations();
+    await loadSpecialists();
+  }
+
+  state.selectedSpecialistId = booking.specialistId;
+  renderSpecialists();
+  await loadSpecialistServices();
+
+  const availableServiceIds = new Set(state.specialistServices.map((service) => service.serviceId));
+  serviceIds
+    .filter((serviceId) => availableServiceIds.has(serviceId))
+    .forEach((serviceId) => state.selectedServiceIds.add(serviceId));
+
+  const today = new Date().toISOString().slice(0, 10);
+  els.requestedDate.value = today;
+  els.requestedDate.min = today;
+  els.message.value = booking.message || "";
+  els.messageCounter.textContent = `${els.message.value.length}/500`;
+  state.selectedTime = "";
+  els.requestedTime.value = "";
+  renderSpecialistServices();
+  updateTotals();
+  await loadSlots();
+  setStep(5);
+  showResult("Данные прошлой записи подставлены. Выберите дату и время.", false);
+}
+
+window.serviceBookingBookingApp = {
+  repeatBooking,
+  setClientProfile
+};
+
+async function getJson(url, options = {}) {
+  const response = await fetch(url, {
+    headers: options.auth && state.clientToken
+      ? { Authorization: `Bearer ${state.clientToken}` }
+      : undefined
+  });
   if (!response.ok) {
     throw new Error(`Request failed: ${response.status}`);
   }
@@ -491,6 +596,25 @@ function getErrorMessage(data) {
 
   const firstError = data?.errors && Object.values(data.errors).flat()[0];
   return firstError || data?.title || "";
+}
+
+function getBookingAuthValue(key) {
+  return localStorage.getItem(key) || sessionStorage.getItem(key);
+}
+
+function getBookingAuthRole() {
+  return getBookingAuthValue("serviceBookingUserRole") || "";
+}
+
+function clearBookingAuth() {
+  localStorage.removeItem("serviceBookingAccessToken");
+  localStorage.removeItem("serviceBookingRefreshToken");
+  localStorage.removeItem("serviceBookingAdminAccessToken");
+  localStorage.removeItem("serviceBookingUserRole");
+  sessionStorage.removeItem("serviceBookingAccessToken");
+  sessionStorage.removeItem("serviceBookingRefreshToken");
+  sessionStorage.removeItem("serviceBookingAdminAccessToken");
+  sessionStorage.removeItem("serviceBookingUserRole");
 }
 
 function escapeHtml(value) {

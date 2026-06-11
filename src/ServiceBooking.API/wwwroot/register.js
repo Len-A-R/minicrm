@@ -1,9 +1,15 @@
 const registerApi = {
-  register: "/api/v1/auth/register"
+  specialist: "/api/v1/auth/register",
+  client: "/api/v1/auth/register/client"
+};
+
+const registerState = {
+  role: "client"
 };
 
 const registerEls = {
   form: document.querySelector("#register-form"),
+  roleButtons: [...document.querySelectorAll("[data-register-role]")],
   fullName: document.querySelector("#register-full-name"),
   email: document.querySelector("#register-email"),
   phone: document.querySelector("#register-phone"),
@@ -23,6 +29,9 @@ const registerEls = {
 document.addEventListener("DOMContentLoaded", initRegister);
 
 function initRegister() {
+  registerEls.roleButtons.forEach((button) => {
+    button.addEventListener("click", () => setRegisterRole(button.dataset.registerRole));
+  });
   registerEls.form.addEventListener("submit", submitRegistration);
   [
     registerEls.fullName,
@@ -37,7 +46,15 @@ function initRegister() {
     validateRegistration();
   });
 
+  setRegisterRole("client");
   validateRegistration();
+}
+
+function setRegisterRole(role) {
+  registerState.role = role === "specialist" ? "specialist" : "client";
+  registerEls.roleButtons.forEach((button) => {
+    button.classList.toggle("active", button.dataset.registerRole === registerState.role);
+  });
 }
 
 async function submitRegistration(event) {
@@ -59,17 +76,33 @@ async function submitRegistration(event) {
   showRegisterResult("", false);
 
   try {
-    const auth = await postJson(registerApi.register, payload);
-    localStorage.setItem("serviceBookingAccessToken", auth.accessToken);
-    localStorage.setItem("serviceBookingRefreshToken", auth.refreshToken);
+    const auth = await postJson(registerApi[registerState.role], payload);
+    persistRegisteredAuth(auth);
     showRegisterResult("Аккаунт создан.", false);
-    window.location.href = "/dashboard.html";
+    window.location.href = auth.role === "Client" ? "/client.html" : "/dashboard.html";
   } catch (error) {
     showRegisterResult(error.message, true);
   } finally {
     registerEls.submit.textContent = "Зарегистрироваться";
     validateRegistration();
   }
+}
+
+function persistRegisteredAuth(auth) {
+  clearAuthStorage(localStorage);
+  clearAuthStorage(sessionStorage);
+  localStorage.setItem("serviceBookingAccessToken", auth.accessToken);
+  localStorage.setItem("serviceBookingUserRole", auth.role);
+  if (auth.refreshToken) {
+    localStorage.setItem("serviceBookingRefreshToken", auth.refreshToken);
+  }
+}
+
+function clearAuthStorage(storage) {
+  storage.removeItem("serviceBookingAccessToken");
+  storage.removeItem("serviceBookingRefreshToken");
+  storage.removeItem("serviceBookingAdminAccessToken");
+  storage.removeItem("serviceBookingUserRole");
 }
 
 function validateRegistration() {

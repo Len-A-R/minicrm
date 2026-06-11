@@ -5,7 +5,7 @@ using ServiceBooking.Application.Calendar;
 namespace ServiceBooking.API.Controllers;
 
 [ApiController]
-[Authorize]
+[Authorize(Roles = "Specialist")]
 [Route("api/v1/calendar")]
 public sealed class CalendarController(ICalendarService calendarService) : ControllerBase
 {

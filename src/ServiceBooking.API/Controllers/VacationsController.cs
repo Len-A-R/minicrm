@@ -5,7 +5,7 @@ using ServiceBooking.Application.Vacations;
 namespace ServiceBooking.API.Controllers;
 
 [ApiController]
-[Authorize]
+[Authorize(Roles = "Specialist")]
 [Route("api/v1/vacations")]
 public sealed class VacationsController(IVacationService vacationService) : ControllerBase
 {

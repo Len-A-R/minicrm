@@ -5,7 +5,7 @@ using ServiceBooking.Application.Profile;
 namespace ServiceBooking.API.Controllers;
 
 [ApiController]
-[Authorize]
+[Authorize(Roles = "Specialist")]
 [Route("api/v1/profile")]
 public sealed class SpecialistProfileController(IProfileService profileService) : ControllerBase
 {

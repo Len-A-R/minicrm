@@ -7,7 +7,7 @@ namespace ServiceBooking.API.Controllers;
 [ApiController]
 public sealed class SpecialistServicesController(ISpecialistServicesService specialistServices) : ControllerBase
 {
-    [Authorize]
+    [Authorize(Roles = "Specialist")]
     [HttpGet("api/v1/specialist-services")]
     [ProducesResponseType<IReadOnlyCollection<SpecialistServiceResponse>>(StatusCodes.Status200OK)]
     [ProducesResponseType<ErrorResponse>(StatusCodes.Status401Unauthorized)]
@@ -36,7 +36,7 @@ public sealed class SpecialistServicesController(ISpecialistServicesService spec
         return result.IsSuccess ? Ok(result.Value) : this.ToErrorResult(result);
     }
 
-    [Authorize]
+    [Authorize(Roles = "Specialist")]
     [HttpPost("api/v1/specialist-services")]
     [ProducesResponseType<SpecialistServiceResponse>(StatusCodes.Status201Created)]
     [ProducesResponseType<ErrorResponse>(StatusCodes.Status400BadRequest)]
@@ -61,7 +61,7 @@ public sealed class SpecialistServicesController(ISpecialistServicesService spec
         return Created($"api/v1/specialist-services/{result.Value!.Id}", result.Value);
     }
 
-    [Authorize]
+    [Authorize(Roles = "Specialist")]
     [HttpPut("api/v1/specialist-services/{id:guid}")]
     [ProducesResponseType<SpecialistServiceResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ErrorResponse>(StatusCodes.Status400BadRequest)]
@@ -83,7 +83,7 @@ public sealed class SpecialistServicesController(ISpecialistServicesService spec
         return result.IsSuccess ? Ok(result.Value) : this.ToErrorResult(result);
     }
 
-    [Authorize]
+    [Authorize(Roles = "Specialist")]
     [HttpDelete("api/v1/specialist-services/{id:guid}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType<ErrorResponse>(StatusCodes.Status401Unauthorized)]

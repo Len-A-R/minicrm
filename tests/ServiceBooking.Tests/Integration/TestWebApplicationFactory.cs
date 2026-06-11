@@ -6,7 +6,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using ServiceBooking.Application.Auth;
 using ServiceBooking.Application.Profile;
+using ServiceBooking.Domain.Entities;
 using ServiceBooking.Infrastructure.Persistence;
 
 namespace ServiceBooking.Tests.Integration;
@@ -49,6 +51,14 @@ public sealed class TestWebApplicationFactory : WebApplicationFactory<Program>
             using var scope = serviceProvider.CreateScope();
             var dbContext = scope.ServiceProvider.GetRequiredService<ServiceBookingDbContext>();
             dbContext.Database.EnsureCreated();
+            var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+            dbContext.AdminUsers.Add(new AdminUser(
+                "Platform Admin",
+                "admin@minicrm",
+                passwordHasher.Hash("Admin12345")));
+            dbContext.SubscriptionPlans.Add(new SubscriptionPlan("Free", 0m, 50, 5, "Starter plan."));
+            dbContext.SubscriptionPlans.Add(new SubscriptionPlan("Pro", 1990m, 0, 0, "Unlimited plan."));
+            dbContext.SaveChanges();
         });
     }
 

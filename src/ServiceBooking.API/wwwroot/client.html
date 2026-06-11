@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ServiceBooking · Кабинет клиента</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body class="dashboard-body client-body no-sidebar">
+  <aside class="dashboard-sidebar" id="client-sidebar" hidden>
+    <div>
+      <p class="eyebrow">ServiceBooking</p>
+      <h1>Клиент</h1>
+    </div>
+    <nav class="dashboard-nav" id="client-nav" aria-label="Разделы кабинета клиента"></nav>
+  </aside>
+
+  <main class="dashboard-main client-main">
+    <section class="client-section" id="client-booking-panel" data-client-section="booking">
+      <section class="booking-panel client-booking-panel" aria-label="Форма бронирования">
+        <header class="booking-header">
+          <div>
+            <p class="eyebrow">ServiceBooking</p>
+            <h1>Бронирование услуги</h1>
+          </div>
+          <div class="summary-pill" id="summary-pill">0 ₽ · 0 мин</div>
+        </header>
+
+        <nav class="step-tabs" aria-label="Шаги формы">
+          <button class="step-tab active" type="button" data-step-target="0">Услуга</button>
+          <button class="step-tab" type="button" data-step-target="1">Место</button>
+          <button class="step-tab" type="button" data-step-target="2">Специалист</button>
+          <button class="step-tab" type="button" data-step-target="3">Цена</button>
+          <button class="step-tab" type="button" data-step-target="4">Контакты</button>
+          <button class="step-tab" type="button" data-step-target="5">Время</button>
+          <button class="step-tab" type="button" data-step-target="6">Сообщение</button>
+        </nav>
+
+        <form id="booking-form" novalidate>
+          <div class="steps-viewport">
+            <section class="step-card active" data-step="0">
+              <div class="field-group">
+                <label for="service-search">Категория услуги</label>
+                <input id="service-search" name="serviceSearch" type="search" autocomplete="off" placeholder="Поиск по названию">
+              </div>
+              <div class="option-list" id="services-list" aria-live="polite"></div>
+            </section>
+
+            <section class="step-card" data-step="1">
+              <div class="section-title">
+                <h2>Территориальное расположение</h2>
+              </div>
+              <div class="option-list" id="locations-list" aria-live="polite"></div>
+            </section>
+
+            <section class="step-card" data-step="2">
+              <div class="section-title">
+                <h2>Специалист</h2>
+              </div>
+              <div class="specialist-grid" id="specialists-list" aria-live="polite"></div>
+            </section>
+
+            <section class="step-card" data-step="3">
+              <div class="section-title">
+                <h2>Конкретные услуги</h2>
+                <span id="services-total">0 ₽ · 0 мин</span>
+              </div>
+              <div class="toggle-list" id="specialist-services-list" aria-live="polite"></div>
+            </section>
+
+            <section class="step-card" data-step="4">
+              <div class="two-column">
+                <div class="field-group">
+                  <label for="client-name">Имя клиента</label>
+                  <input id="client-name" name="clientName" type="text" autocomplete="name" required>
+                  <small class="field-error" id="client-name-error"></small>
+                </div>
+                <div class="field-group">
+                  <label for="client-phone">Номер телефона</label>
+                  <input id="client-phone" name="clientPhone" type="tel" autocomplete="tel" inputmode="tel" required placeholder="+7 999 123-45-67">
+                  <small class="field-error" id="client-phone-error"></small>
+                </div>
+              </div>
+            </section>
+
+            <section class="step-card" data-step="5">
+              <div class="two-column">
+                <div class="field-group">
+                  <label for="requested-date">Дата</label>
+                  <input id="requested-date" name="requestedDate" type="date" required>
+                </div>
+                <div class="field-group">
+                  <label for="requested-time">Время</label>
+                  <select id="requested-time" name="requestedTime" required>
+                    <option value="">Выберите слот</option>
+                  </select>
+                </div>
+              </div>
+              <div class="slot-grid" id="slots-list" aria-live="polite"></div>
+            </section>
+
+            <section class="step-card" data-step="6">
+              <div class="field-group">
+                <label for="message">Сообщение</label>
+                <textarea id="message" name="message" maxlength="500" rows="7" placeholder="Дополнительная информация, пожелания..."></textarea>
+                <small class="counter" id="message-counter">0/500</small>
+              </div>
+            </section>
+          </div>
+
+          <footer class="booking-actions">
+            <button class="secondary-button" id="back-button" type="button">Назад</button>
+            <button class="secondary-button" id="next-button" type="button">Далее</button>
+            <button class="primary-button" id="submit-button" type="submit" disabled>Отправить заявку</button>
+          </footer>
+        </form>
+
+        <div class="result-banner" id="result-banner" role="status" aria-live="polite"></div>
+      </section>
+    </section>
+
+    <section class="client-section" id="client-history-panel" data-client-section="history" hidden>
+      <div class="client-card-list" id="client-history-list" aria-live="polite"></div>
+    </section>
+
+    <section class="client-section" id="client-notifications-panel" data-client-section="notifications" hidden>
+      <div class="client-card-list" id="client-notifications-list" aria-live="polite"></div>
+    </section>
+
+    <section class="client-section" id="client-profile-panel" data-client-section="profile" hidden>
+      <form class="client-profile-form" id="client-profile-form" novalidate>
+        <div class="field-group">
+          <label for="client-profile-full-name">ФИО</label>
+          <input id="client-profile-full-name" name="fullName" type="text" autocomplete="name" required>
+          <small class="field-error" id="client-profile-full-name-error"></small>
+        </div>
+        <div class="field-group">
+          <label for="client-profile-phone">Номер телефона</label>
+          <input id="client-profile-phone" name="phone" type="tel" autocomplete="tel" inputmode="tel" required>
+          <small class="field-error" id="client-profile-phone-error"></small>
+        </div>
+        <div class="client-profile-actions">
+          <button type="submit" class="primary-button" id="client-profile-save-button">Сохранить</button>
+          <button type="button" class="secondary-button" id="client-logout-button">Выйти</button>
+        </div>
+        <div class="result-banner client-profile-result" id="client-profile-result" role="status" aria-live="polite"></div>
+      </form>
+    </section>
+  </main>
+
+  <div class="toast" id="client-toast" role="status" aria-live="polite"></div>
+
+  <script src="/app.js" defer></script>
+  <script src="/client.js" defer></script>
+</body>
+</html>

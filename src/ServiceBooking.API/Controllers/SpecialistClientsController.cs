@@ -5,7 +5,7 @@ using ServiceBooking.Application.SpecialistClients;
 namespace ServiceBooking.API.Controllers;
 
 [ApiController]
-[Authorize]
+[Authorize(Roles = "Specialist")]
 [Route("api/v1/specialist/clients")]
 public sealed class SpecialistClientsController(ISpecialistClientService clientService) : ControllerBase
 {

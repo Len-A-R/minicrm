@@ -1,9 +1,12 @@
+using ServiceBooking.Application.Admin;
 using ServiceBooking.Application.Common;
 using DomainSpecialistService = ServiceBooking.Domain.Entities.SpecialistService;
 
 namespace ServiceBooking.Application.SpecialistServices;
 
-public sealed class SpecialistServicesService(ISpecialistServiceRepository repository) : ISpecialistServicesService
+public sealed class SpecialistServicesService(
+    ISpecialistServiceRepository repository,
+    ISubscriptionQuotaService subscriptionQuota) : ISpecialistServicesService
 {
     public async Task<ServiceResult<IReadOnlyCollection<SpecialistServiceResponse>>> ListForSpecialistAsync(
         Guid specialistId,
@@ -30,6 +33,12 @@ public sealed class SpecialistServicesService(ISpecialistServiceRepository repos
         if (validation is not null)
         {
             return validation;
+        }
+
+        var quota = await subscriptionQuota.CheckServiceQuotaAsync(specialistId, cancellationToken);
+        if (!quota.IsSuccess)
+        {
+            return ServiceResult<SpecialistServiceResponse>.Failure(quota.Status, quota.Error!.Code, quota.Error.Message);
         }
 
         try

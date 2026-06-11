@@ -1,5 +1,6 @@
 using ServiceBooking.Application.Bookings;
 using ServiceBooking.Application.Common;
+using ServiceBooking.Application.Admin;
 using ServiceBooking.Domain.Entities;
 
 namespace ServiceBooking.Tests.Application;
@@ -157,7 +158,8 @@ public sealed class BookingServiceTests
         return new ServiceBooking.Application.Bookings.BookingService(
             bookingRepository,
             new ClientAutoCreationService(clientRepository),
-            new FakeDateTimeProvider(new DateTimeOffset(2026, 6, 11, 0, 0, 0, TimeSpan.Zero)));
+            new FakeDateTimeProvider(new DateTimeOffset(2026, 6, 11, 0, 0, 0, TimeSpan.Zero)),
+            new FakeSubscriptionQuotaService());
     }
 
     private sealed class FakeBookingRepository : IBookingRepository
@@ -211,5 +213,18 @@ public sealed class BookingServiceTests
     private sealed class FakeDateTimeProvider(DateTimeOffset utcNow) : IDateTimeProvider
     {
         public DateTimeOffset UtcNow { get; } = utcNow;
+    }
+
+    private sealed class FakeSubscriptionQuotaService : ISubscriptionQuotaService
+    {
+        public Task<ServiceResult<bool>> CheckBookingQuotaAsync(Guid specialistId, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(ServiceResult<bool>.Success(true));
+        }
+
+        public Task<ServiceResult<bool>> CheckServiceQuotaAsync(Guid specialistId, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(ServiceResult<bool>.Success(true));
+        }
     }
 }

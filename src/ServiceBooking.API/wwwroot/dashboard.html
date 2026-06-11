@@ -6,48 +6,16 @@
   <title>ServiceBooking · Кабинет специалиста</title>
   <link rel="stylesheet" href="/styles.css">
 </head>
-<body class="dashboard-body">
-  <aside class="dashboard-sidebar">
+<body class="dashboard-body specialist-body no-sidebar">
+  <aside class="dashboard-sidebar" id="dashboard-sidebar" hidden>
     <div>
       <p class="eyebrow">ServiceBooking</p>
       <h1>Кабинет</h1>
     </div>
-    <nav class="dashboard-nav" aria-label="Разделы кабинета">
-      <button type="button" class="dashboard-nav-item" data-route="profile">Профиль</button>
-      <button type="button" class="dashboard-nav-item active" data-route="bookings">Заявки</button>
-      <button type="button" class="dashboard-nav-item" data-route="clients">Клиенты</button>
-      <button type="button" class="dashboard-nav-item" data-route="services">Услуги</button>
-      <button type="button" class="dashboard-nav-item" data-route="calendar">Календарь</button>
-      <button type="button" class="dashboard-nav-item" data-route="kanban">Kanban</button>
-      <button type="button" class="dashboard-nav-item" data-route="reports">Бухгалтерия</button>
-    </nav>
-    <button type="button" class="secondary-button" id="logout-button">Выйти</button>
+    <nav class="dashboard-nav" id="dashboard-nav" aria-label="Разделы кабинета"></nav>
   </aside>
 
   <main class="dashboard-main">
-    <header class="dashboard-topbar">
-      <div>
-        <p class="eyebrow" id="dashboard-section-label">Заявки</p>
-        <h2 id="dashboard-title">Управление заявками</h2>
-      </div>
-      <button type="button" class="secondary-button" id="refresh-button">Обновить</button>
-    </header>
-
-    <section class="login-panel" id="login-panel" hidden>
-      <form id="login-form" class="login-form">
-        <div class="field-group">
-          <label for="login-email">Email</label>
-          <input id="login-email" type="email" autocomplete="email" required>
-        </div>
-        <div class="field-group">
-          <label for="login-password">Пароль</label>
-          <input id="login-password" type="password" autocomplete="current-password" required>
-        </div>
-        <button class="primary-button" type="submit">Войти</button>
-        <a class="auth-link" href="/register.html">Зарегистрироваться как специалист</a>
-      </form>
-    </section>
-
     <section class="dashboard-content" id="dashboard-content" aria-live="polite"></section>
   </main>
 

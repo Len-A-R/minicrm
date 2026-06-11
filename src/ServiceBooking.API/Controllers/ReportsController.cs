@@ -5,7 +5,7 @@ using ServiceBooking.Application.Reports;
 namespace ServiceBooking.API.Controllers;
 
 [ApiController]
-[Authorize]
+[Authorize(Roles = "Specialist")]
 [Route("api/v1/reports")]
 public sealed class ReportsController(IReportService reportService) : ControllerBase
 {

@@ -30,7 +30,7 @@ public sealed class LocationsController(ILocationService locationService) : Cont
         return result.IsSuccess ? Ok(result.Value) : this.ToErrorResult(result);
     }
 
-    [Authorize]
+    [Authorize(Roles = "Specialist")]
     [HttpPost]
     [ProducesResponseType<LocationResponse>(StatusCodes.Status201Created)]
     [ProducesResponseType<ErrorResponse>(StatusCodes.Status400BadRequest)]
@@ -47,7 +47,7 @@ public sealed class LocationsController(ILocationService locationService) : Cont
         return CreatedAtAction(nameof(Get), new { id = result.Value!.Id }, result.Value);
     }
 
-    [Authorize]
+    [Authorize(Roles = "Specialist")]
     [HttpPut("{id:guid}")]
     [ProducesResponseType<LocationResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ErrorResponse>(StatusCodes.Status400BadRequest)]
@@ -61,7 +61,7 @@ public sealed class LocationsController(ILocationService locationService) : Cont
         return result.IsSuccess ? Ok(result.Value) : this.ToErrorResult(result);
     }
 
-    [Authorize]
+    [Authorize(Roles = "Specialist")]
     [HttpDelete("{id:guid}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType<ErrorResponse>(StatusCodes.Status404NotFound)]

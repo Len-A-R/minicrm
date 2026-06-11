@@ -16,6 +16,7 @@ public sealed class PublicSpecialistRepository(ServiceBookingDbContext dbContext
             .Include(specialist => specialist.Location)
             .Include(specialist => specialist.Services)
             .Where(specialist => specialist.LocationId == locationId
+                && !specialist.IsBlocked
                 && specialist.Services.Any(specialistService => specialistService.ServiceId == serviceId))
             .OrderBy(specialist => specialist.FullName)
             .ToArrayAsync(cancellationToken);

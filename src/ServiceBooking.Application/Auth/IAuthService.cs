@@ -6,6 +6,8 @@ public interface IAuthService
 {
     Task<ServiceResult<AuthResponse>> RegisterAsync(RegisterSpecialistRequest request, CancellationToken cancellationToken);
 
+    Task<ServiceResult<AuthResponse>> RegisterClientAsync(RegisterClientRequest request, CancellationToken cancellationToken);
+
     Task<ServiceResult<AuthResponse>> LoginAsync(LoginRequest request, CancellationToken cancellationToken);
 
     Task<ServiceResult<AuthResponse>> RefreshAsync(RefreshTokenRequest request, CancellationToken cancellationToken);
